@@ -74,6 +74,6 @@ internal static class TypeExtensions
         if (type is IArrayTypeSymbol arrayType)
             return arrayType.ElementType;
 
-        return type.AllInterfaces.FirstOrDefault(i => i.Name == "IEnumerable" && i.IsGenericType)?.TypeArguments.FirstOrDefault();
+        return type.AllInterfaces.FirstOrDefault(i => object.Equals(i.Name, "IEnumerable") && i.IsGenericType)?.TypeArguments.FirstOrDefault();
     }
 }
