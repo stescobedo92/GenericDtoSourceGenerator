@@ -1,7 +1,11 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using System.Collections.Generic;
+using Microsoft.CodeAnalysis;
 
 namespace GenericDto.Analyzers.Generators.Incremental;
 
+/// <summary>
+/// Contains the context information needed to generate a DTO.
+/// </summary>
 internal readonly struct DtoGenerationContext
 {
     public INamedTypeSymbol SourceType { get; }
@@ -10,7 +14,12 @@ internal readonly struct DtoGenerationContext
     public string DtoClassName { get; }
     public List<PropertyContext> Properties { get; }
 
-    public DtoGenerationContext(INamedTypeSymbol sourceType, AttributeData generateDtoAttribute, string targetNamespace, string dtoClassName, List<PropertyContext> properties)
+    public DtoGenerationContext(
+        INamedTypeSymbol sourceType,
+        AttributeData generateDtoAttribute,
+        string targetNamespace,
+        string dtoClassName,
+        List<PropertyContext> properties)
     {
         SourceType = sourceType;
         GenerateDtoAttribute = generateDtoAttribute;
@@ -20,6 +29,9 @@ internal readonly struct DtoGenerationContext
     }
 }
 
+/// <summary>
+/// Contains the context information for a single property in the DTO.
+/// </summary>
 internal readonly struct PropertyContext
 {
     public string PropertyName { get; }
@@ -31,7 +43,15 @@ internal readonly struct PropertyContext
     public bool IsReadOnly { get; }
     public IPropertySymbol SourceProperty { get; }
 
-    public PropertyContext(string propertyName, string propertyType, bool isNullable, bool hasDefaultValue, string? defaultValue, bool isRequired, bool isReadOnly, IPropertySymbol sourceProperty)
+    public PropertyContext(
+        string propertyName,
+        string propertyType,
+        bool isNullable,
+        bool hasDefaultValue,
+        string? defaultValue,
+        bool isRequired,
+        bool isReadOnly,
+        IPropertySymbol sourceProperty)
     {
         PropertyName = propertyName;
         PropertyType = propertyType;
