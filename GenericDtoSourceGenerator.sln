@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericDto.Analyzers", "Gen
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericDto.Example", "GenericDto.Example\GenericDto.Example.csproj", "{A83907EE-A654-4C00-B742-6125FA91D53F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericDto.Tests", "GenericDto.Tests\GenericDto.Tests.csproj", "{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,6 +61,18 @@ Global
 		{A83907EE-A654-4C00-B742-6125FA91D53F}.Release|x64.Build.0 = Release|Any CPU
 		{A83907EE-A654-4C00-B742-6125FA91D53F}.Release|x86.ActiveCfg = Release|Any CPU
 		{A83907EE-A654-4C00-B742-6125FA91D53F}.Release|x86.Build.0 = Release|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Debug|x64.Build.0 = Debug|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Debug|x86.Build.0 = Debug|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Release|x64.ActiveCfg = Release|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Release|x64.Build.0 = Release|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Release|x86.ActiveCfg = Release|Any CPU
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
