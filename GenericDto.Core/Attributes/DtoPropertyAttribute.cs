@@ -10,7 +10,7 @@ namespace GenericDto.Core.Attributes;
 /// <code>
 /// public class Customer
 /// {
-///     [DtoProperty(Name = "CustomerName", ForceNullable = false)]
+///     [DtoProperty(Name = "CustomerName", ForceNullable = NullableOption.True)]
 ///     public string? Name { get; set; }
 ///     
 ///     [DtoProperty(Ignore = true)]
@@ -49,11 +49,11 @@ public sealed class DtoPropertyAttribute : Attribute
 
     /// <summary>
     /// Gets or sets whether to force the property to be nullable.
-    /// When true, the property will be nullable in the DTO regardless of source.
-    /// When false, the property will be non-nullable.
-    /// When null (default), inherits nullability from the source property.
+    /// Use NullableOption.Inherit (default) to inherit from source property.
+    /// Use NullableOption.True to force nullable.
+    /// Use NullableOption.False to force non-nullable.
     /// </summary>
-    public bool? ForceNullable { get; set; }
+    public NullableOption ForceNullable { get; set; } = NullableOption.Inherit;
 
     /// <summary>
     /// Gets or sets the order of this property in the generated DTO.
@@ -96,4 +96,25 @@ public sealed class DtoPropertyAttribute : Attribute
     /// When set with MinValue, adds [Range] attribute to the generated property.
     /// </summary>
     public double MaxValue { get; set; } = double.MaxValue;
+}
+
+/// <summary>
+/// Specifies nullable behavior for DTO property generation.
+/// </summary>
+public enum NullableOption
+{
+    /// <summary>
+    /// Inherit nullability from the source property.
+    /// </summary>
+    Inherit = 0,
+
+    /// <summary>
+    /// Force the property to be nullable.
+    /// </summary>
+    True = 1,
+
+    /// <summary>
+    /// Force the property to be non-nullable.
+    /// </summary>
+    False = 2
 }
