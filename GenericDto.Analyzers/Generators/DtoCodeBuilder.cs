@@ -96,20 +96,11 @@ internal static class DtoCodeBuilder
             usings.Add(sourceNamespace);
         }
 
-        // Add additional usings from attribute
-        var additionalUsings = context.GenerateDtoAttribute.NamedArguments
-            .FirstOrDefault(na => na.Key == "AdditionalUsings")
-            .Value;
-
-        if (!additionalUsings.IsNull && additionalUsings.Values.Length > 0)
+        // Add additional usings from attribute - use the safe extension method
+        var additionalUsings = context.GenerateDtoAttribute.GetNamedArgumentAsStringArray("AdditionalUsings");
+        foreach (var usingStr in additionalUsings)
         {
-            foreach (var usingValue in additionalUsings.Values)
-            {
-                if (usingValue.Value is string usingStr)
-                {
-                    usings.Add(usingStr);
-                }
-            }
+            usings.Add(usingStr);
         }
 
         // Add IEquatable using if needed
@@ -371,8 +362,9 @@ internal static class DtoCodeBuilder
         if (context.Properties.Count > 0)
         {
             var propertyStrings = context.Properties
-                .Select(p => $"{p.PropertyName} = {{{p.PropertyName}}}");
-            sb.AppendLine($"return $\"{context.DtoClassName} {{ {string.Join(", ", propertyStrings)} }}\";");
+                .Select(p => $"{p.PropertyName} = {{{{{p.PropertyName}}}}}");
+            // Generate: return $"CustomerDto {{ Id = {Id}, Name = {Name} }}";
+            sb.AppendLine($"return $\"{context.DtoClassName} {{{{ {string.Join(", ", propertyStrings)} }}}}\";");
         }
         else
         {

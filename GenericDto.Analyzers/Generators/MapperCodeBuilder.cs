@@ -59,6 +59,9 @@ internal static class MapperCodeBuilder
         var sourceTypeName = context.SourceType.Name;
         var sourceTypeFullName = context.SourceType.ToDisplayString();
         var dtoName = context.DtoClassName;
+        
+        // Get the access modifier from the DTO attribute
+        var accessModifier = context.GenerateDtoAttribute.GetNamedArgument<string>("AccessModifier") ?? "public";
 
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Extension methods for mapping between <see cref=\"{sourceTypeFullName}\"/> and <see cref=\"{dtoName}\"/>.");
@@ -66,7 +69,7 @@ internal static class MapperCodeBuilder
         sb.AppendLine("[global::System.CodeDom.Compiler.GeneratedCodeAttribute(\"GenericDto.Analyzers\", \"1.0.0\")]");
         sb.AppendLine("[global::System.Diagnostics.DebuggerNonUserCodeAttribute]");
         sb.AppendLine("[global::System.Runtime.CompilerServices.CompilerGeneratedAttribute]");
-        sb.AppendLine($"public static class {dtoName}MapperExtensions");
+        sb.AppendLine($"{accessModifier} static class {dtoName}MapperExtensions");
         sb.AppendLine("{");
         sb.IncreaseIndent();
 
@@ -94,6 +97,8 @@ internal static class MapperCodeBuilder
 
     private static void WriteToDto(IndentedStringBuilder sb, DtoGenerationContext context, string sourceTypeName, string sourceTypeFullName, string dtoName)
     {
+        var isSourceValueType = context.SourceType.IsValueType;
+        
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Maps a <see cref=\"{sourceTypeFullName}\"/> instance to a new <see cref=\"{dtoName}\"/> instance.");
         sb.AppendLine("/// </summary>");
@@ -102,13 +107,19 @@ internal static class MapperCodeBuilder
         sb.AppendLine($"public static {dtoName} ToDto(this {sourceTypeFullName} source)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
-        sb.AppendLine("if (source is null)");
-        sb.AppendLine("{");
-        sb.IncreaseIndent();
-        sb.AppendLine("throw new global::System.ArgumentNullException(nameof(source));");
-        sb.DecreaseIndent();
-        sb.AppendLine("}");
-        sb.AppendLine();
+        
+        // Only add null check for reference types
+        if (!isSourceValueType)
+        {
+            sb.AppendLine("if (source is null)");
+            sb.AppendLine("{");
+            sb.IncreaseIndent();
+            sb.AppendLine("throw new global::System.ArgumentNullException(nameof(source));");
+            sb.DecreaseIndent();
+            sb.AppendLine("}");
+            sb.AppendLine();
+        }
+        
         sb.AppendLine($"return new {dtoName}");
         sb.AppendLine("{");
         sb.IncreaseIndent();
@@ -228,6 +239,8 @@ internal static class MapperCodeBuilder
 
     private static void WriteUpdateEntity(IndentedStringBuilder sb, DtoGenerationContext context, string sourceTypeName, string sourceTypeFullName, string dtoName)
     {
+        var isSourceValueType = context.SourceType.IsValueType;
+        
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Updates an existing <see cref=\"{sourceTypeFullName}\"/> instance with values from a <see cref=\"{dtoName}\"/>.");
         sb.AppendLine("/// </summary>");
@@ -237,13 +250,19 @@ internal static class MapperCodeBuilder
         sb.AppendLine($"public static {sourceTypeFullName} UpdateFrom(this {sourceTypeFullName} entity, {dtoName} dto)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
-        sb.AppendLine("if (entity is null)");
-        sb.AppendLine("{");
-        sb.IncreaseIndent();
-        sb.AppendLine("throw new global::System.ArgumentNullException(nameof(entity));");
-        sb.DecreaseIndent();
-        sb.AppendLine("}");
-        sb.AppendLine();
+        
+        // Only add null check for reference types
+        if (!isSourceValueType)
+        {
+            sb.AppendLine("if (entity is null)");
+            sb.AppendLine("{");
+            sb.IncreaseIndent();
+            sb.AppendLine("throw new global::System.ArgumentNullException(nameof(entity));");
+            sb.DecreaseIndent();
+            sb.AppendLine("}");
+            sb.AppendLine();
+        }
+        
         sb.AppendLine("if (dto is null)");
         sb.AppendLine("{");
         sb.IncreaseIndent();

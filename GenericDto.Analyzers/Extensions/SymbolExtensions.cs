@@ -131,17 +131,19 @@ internal static class SymbolExtensions
                 if (value.IsNull)
                     return default;
 
-                // Handle arrays
-                if (!value.Values.IsDefaultOrEmpty)
+                // Handle arrays - only access Values if Kind is Array
+                if (value.Kind == TypedConstantKind.Array)
                 {
                     if (typeof(T) == typeof(string[]))
                     {
                         var stringArray = value.Values
-                            .Where(v => v.Value is string)
+                            .Where(v => !v.IsNull && v.Value is string)
                             .Select(v => (string)v.Value!)
                             .ToArray();
                         return (T)(object)stringArray;
                     }
+                    // Return default for other array types we don't handle
+                    return default;
                 }
 
                 // Handle direct value
@@ -152,6 +154,20 @@ internal static class SymbolExtensions
                 if (typeof(T).IsEnum && value.Value != null)
                 {
                     return (T)Enum.ToObject(typeof(T), value.Value);
+                }
+
+                // Handle nullable types
+                var underlyingType = Nullable.GetUnderlyingType(typeof(T));
+                if (underlyingType != null && value.Value != null)
+                {
+                    if (underlyingType.IsEnum)
+                    {
+                        return (T)Enum.ToObject(underlyingType, value.Value);
+                    }
+                    if (underlyingType.IsAssignableFrom(value.Value.GetType()))
+                    {
+                        return (T)value.Value;
+                    }
                 }
 
                 break;
@@ -171,12 +187,23 @@ internal static class SymbolExtensions
             {
                 var value = namedArg.Value;
 
-                if (!value.Values.IsDefaultOrEmpty)
+                // Check if it's null
+                if (value.IsNull)
+                    return Array.Empty<string>();
+
+                // Check if it's an array type (Kind == Array)
+                if (value.Kind == TypedConstantKind.Array && !value.Values.IsDefaultOrEmpty)
                 {
                     return value.Values
-                        .Where(v => v.Value is string)
+                        .Where(v => !v.IsNull && v.Value is string)
                         .Select(v => (string)v.Value!)
                         .ToArray();
+                }
+
+                // If it's a single string value, return it as array
+                if (value.Value is string singleValue)
+                {
+                    return new[] { singleValue };
                 }
             }
         }
