@@ -27,7 +27,7 @@ public class Customer
     [DtoIgnore]
     public string InternalCode { get; set; } = string.Empty;
 
-    [DtoProperty(ForceNullable = true)]
+    [DtoProperty(ForceNullable = NullableOption.True)]
     public string? PhoneNumber { get; set; }
 }
 
