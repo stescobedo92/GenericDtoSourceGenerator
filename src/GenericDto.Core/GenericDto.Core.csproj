@@ -22,7 +22,7 @@
     <PackageIcon>binarycoffee.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
-    <PackageReleaseNotes>Initial release of BinaryCoffee.GenericDto - A powerful C# source generator for automatic DTO generation.</PackageReleaseNotes>
+    <PackageReleaseNotes>BinaryCoffee.GenericDto - A powerful C# source generator for automatic DTO generation.</PackageReleaseNotes>
     
     <!-- Repository Information -->
     <RepositoryType>git</RepositoryType>
