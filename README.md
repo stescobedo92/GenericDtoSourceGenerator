@@ -20,7 +20,7 @@ A powerful C# source generator that automatically generates Data Transfer Object
 ### NuGet Package
 
 ```bash
-dotnet add package BinaryCoffee.GenericDto --version 1.0.0
+dotnet add package BinaryCoffee.GenericDto --version 1.0.1
 ```
 
 ## Quick Start
