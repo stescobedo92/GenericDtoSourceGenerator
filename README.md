@@ -17,24 +17,10 @@ A powerful C# source generator that automatically generates Data Transfer Object
 
 ## Installation
 
-### NuGet Package (coming soon)
+### NuGet Package
 
 ```bash
-dotnet add package GenericDto.Analyzers
-```
-
-### Manual Installation
-
-1. Add the `GenericDto.Core` project reference for attributes
-2. Add the `GenericDto.Analyzers` project reference as an analyzer
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="..\GenericDto.Core\GenericDto.Core.csproj" />
-  <ProjectReference Include="..\GenericDto.Analyzers\GenericDto.Analyzers.csproj" 
-                    OutputItemType="Analyzer" 
-                    ReferenceOutputAssembly="false" />
-</ItemGroup>
+dotnet add package BinaryCoffee.GenericDto --version 1.0.0
 ```
 
 ## Quick Start
@@ -245,27 +231,6 @@ namespace YourNamespace.Dto
 - .NET 10.0+ (for the example project)
 - .NET Standard 2.0 compatible (for the analyzers and core attributes)
 - Visual Studio 2022 or later / Rider / VS Code with C# extension
-
-## Project Structure
-
-```
-GenericDtoSourceGenerator/
-├── GenericDto.Core/              # Attribute definitions
-│   └── Attributes/
-│       ├── GenericDtoAttribute.cs
-│       ├── DtoPropertyAttribute.cs
-│       ├── DtoIgnoreAttribute.cs
-│       └── DtoValidationAttribute.cs
-├── GenericDto.Analyzers/         # Source generator
-│   ├── Generators/
-│   │   ├── DtoSourceGenerator.cs
-│   │   ├── DtoCodeBuilder.cs
-│   │   └── MapperCodeBuilder.cs
-│   ├── Extensions/
-│   ├── Constants/
-│   └── Diagnostics/
-└── GenericDto.Example/           # Example project
-```
 
 ## License
 
