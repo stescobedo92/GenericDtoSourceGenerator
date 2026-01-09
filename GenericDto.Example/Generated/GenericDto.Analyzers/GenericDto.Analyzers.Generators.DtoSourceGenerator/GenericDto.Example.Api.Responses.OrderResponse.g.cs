@@ -79,7 +79,7 @@ namespace GenericDto.Example.Api.Responses
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"OrderResponse {{ OrderId = {{OrderId}}, CustomerName = {{CustomerName}}, TotalAmount = {{TotalAmount}}, OrderDate = {{OrderDate}}, Status = {{Status}} }}";
+            return $"OrderResponse {{ OrderId = {OrderId}, CustomerName = {CustomerName}, TotalAmount = {TotalAmount}, OrderDate = {OrderDate}, Status = {Status} }}";
         }
     }
 }

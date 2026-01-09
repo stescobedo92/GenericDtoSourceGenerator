@@ -16,4 +16,10 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude generated files from compilation to avoid duplicate type definitions 
+         since the source generator already adds them to the compilation -->
+    <Compile Remove="Generated\**" />
+  </ItemGroup>
+
 </Project>

@@ -112,7 +112,7 @@ namespace GenericDto.Example.Models.Dto
         /// <inheritdoc/>
         public override string ToString()
         {
-            return $"CustomerDto {{ Id = {{Id}}, FullName = {{FullName}}, Email = {{Email}}, CreatedAt = {{CreatedAt}}, IsActive = {{IsActive}}, PhoneNumber = {{PhoneNumber}} }}";
+            return $"CustomerDto {{ Id = {Id}, FullName = {FullName}, Email = {Email}, CreatedAt = {CreatedAt}, IsActive = {IsActive}, PhoneNumber = {PhoneNumber} }}";
         }
     }
 }
