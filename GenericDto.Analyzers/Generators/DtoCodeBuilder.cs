@@ -362,7 +362,7 @@ internal static class DtoCodeBuilder
         if (context.Properties.Count > 0)
         {
             var propertyStrings = context.Properties
-                .Select(p => $"{p.PropertyName} = {{{{{p.PropertyName}}}}}");
+                .Select(p => $"{p.PropertyName} = {{{p.PropertyName}}}");
             // Generate: return $"CustomerDto {{ Id = {Id}, Name = {Name} }}";
             sb.AppendLine($"return $\"{context.DtoClassName} {{{{ {string.Join(", ", propertyStrings)} }}}}\";");
         }
