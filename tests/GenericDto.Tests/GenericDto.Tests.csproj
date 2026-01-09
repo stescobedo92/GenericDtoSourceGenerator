@@ -20,8 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GenericDto.Core\GenericDto.Core.csproj" />
-    <ProjectReference Include="..\GenericDto.Analyzers\GenericDto.Analyzers.csproj" />
+    <ProjectReference Include="..\..\src\GenericDto.Core\GenericDto.Core.csproj" />
+    <ProjectReference Include="..\..\src\GenericDto.Analyzers\GenericDto.Analyzers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
