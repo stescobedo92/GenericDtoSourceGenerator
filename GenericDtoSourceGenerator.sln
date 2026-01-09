@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36603.0
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
@@ -14,6 +14,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericDto.Example", "GenericDto.Example\GenericDto.Example.csproj", "{A83907EE-A654-4C00-B742-6125FA91D53F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericDto.Tests", "GenericDto.Tests\GenericDto.Tests.csproj", "{F0C3B463-E7CC-405A-AD1B-4B08A0D99058}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "example", "example", "{9DBEA77B-E2E5-467B-A49C-AD648C8885DB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -80,6 +82,8 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{17C83C50-5573-4B9D-B1FC-9029A921C9AF} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{B34BDACC-EB99-46F7-948B-341E7B75517D} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{A83907EE-A654-4C00-B742-6125FA91D53F} = {9DBEA77B-E2E5-467B-A49C-AD648C8885DB}
+		{F0C3B463-E7CC-405A-AD1B-4B08A0D99058} = {5EF95544-FD2E-4CB4-A979-DCD810F8ABD6}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {21020B1B-D7B9-499D-9BA5-D5C699DC3CD9}
