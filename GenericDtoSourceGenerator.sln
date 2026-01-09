@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.31903.59
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
@@ -16,6 +16,11 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenericDto.Tests", "tests\GenericDto.Tests\GenericDto.Tests.csproj", "{81419D15-26A8-44A1-BF41-E2C859929CF2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "assets", "assets", "{794C91F6-D6A3-4DA7-B43D-D26AA89E93BF}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\..\Downloads\binarycoffee.png = ..\..\..\Downloads\binarycoffee.png
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -84,5 +89,8 @@ Global
 		{9CC4A0CD-6C1D-41E3-AE03-81C7C4546996} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{37345102-2A3A-42E7-A063-1A715399C0F1} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{81419D15-26A8-44A1-BF41-E2C859929CF2} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7743C47C-030D-45C6-858E-3836176DBEF9}
 	EndGlobalSection
 EndGlobal
