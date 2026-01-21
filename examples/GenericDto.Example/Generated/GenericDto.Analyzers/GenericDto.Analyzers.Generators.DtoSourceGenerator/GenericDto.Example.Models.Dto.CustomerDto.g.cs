@@ -28,10 +28,11 @@ namespace GenericDto.Example.Models.Dto
         /// Gets or sets the FullName value.
         /// </summary>
         [global::System.ComponentModel.DataAnnotations.Required]
+        [global::System.ComponentModel.DataAnnotations.MaxLength(100)]
         public string FullName { get; set; } = string.Empty;
 
         /// <summary>
-        /// Gets or sets the Email value.
+        /// Customer email address
         /// </summary>
         [global::System.ComponentModel.DataAnnotations.Required]
         public string Email { get; set; } = string.Empty;

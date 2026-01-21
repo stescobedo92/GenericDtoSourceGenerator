@@ -42,6 +42,12 @@ internal readonly struct PropertyContext
     public bool IsRequired { get; }
     public bool IsReadOnly { get; }
     public IPropertySymbol SourceProperty { get; }
+    public string? Description { get; }
+    public int MaxLength { get; }
+    public int MinLength { get; }
+    public string? Pattern { get; }
+    public double MinValue { get; }
+    public double MaxValue { get; }
 
     public PropertyContext(
         string propertyName,
@@ -51,7 +57,13 @@ internal readonly struct PropertyContext
         string? defaultValue,
         bool isRequired,
         bool isReadOnly,
-        IPropertySymbol sourceProperty)
+        IPropertySymbol sourceProperty,
+        string? description = null,
+        int maxLength = -1,
+        int minLength = -1,
+        string? pattern = null,
+        double minValue = double.MinValue,
+        double maxValue = double.MaxValue)
     {
         PropertyName = propertyName;
         PropertyType = propertyType;
@@ -61,5 +73,11 @@ internal readonly struct PropertyContext
         IsRequired = isRequired;
         IsReadOnly = isReadOnly;
         SourceProperty = sourceProperty;
+        Description = description;
+        MaxLength = maxLength;
+        MinLength = minLength;
+        Pattern = pattern;
+        MinValue = minValue;
+        MaxValue = maxValue;
     }
 }
