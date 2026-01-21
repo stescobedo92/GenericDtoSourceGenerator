@@ -383,23 +383,24 @@ namespace TestNamespace
     public void Should_Not_Generate_Validation_Attributes_For_Default_Values()
     {
         // Arrange
-        var source = @"
+        // Note: The extreme double values below represent double.MinValue and double.MaxValue
+        var source = $@"
 using GenericDto.Core.Attributes;
 
 namespace TestNamespace
-{
+{{
     [GenericDto]
     public class Product
-    {
-        public int Id { get; set; }
+    {{
+        public int Id {{ get; set; }}
         
         [DtoProperty(MaxLength = -1, MinLength = -1)]
-        public string Name { get; set; }
+        public string Name {{ get; set; }}
         
-        [DtoProperty(MinValue = -1.7976931348623157E+308, MaxValue = 1.7976931348623157E+308)]
-        public double Price { get; set; }
-    }
-}";
+        [DtoProperty(MinValue = {double.MinValue}, MaxValue = {double.MaxValue})]
+        public double Price {{ get; set; }}
+    }}
+}}";
 
         // Act
         var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
@@ -412,8 +413,8 @@ namespace TestNamespace
         // When MaxLength/MinLength are -1 (default), should not generate attributes
         dtoSource.Should().NotContain("[global::System.ComponentModel.DataAnnotations.MaxLength(-1)]");
         dtoSource.Should().NotContain("[global::System.ComponentModel.DataAnnotations.MinLength(-1)]");
-        // When MinValue/MaxValue are at their limits, they should not generate Range attribute
-        // Note: The Range attribute will still be generated if both are at extremes, so we check for absence of Range with default values
+        // When MinValue/MaxValue are at their extremes, they should not generate Range attribute
+        dtoSource.Should().NotContain("Range");
     }
 
     [Fact]

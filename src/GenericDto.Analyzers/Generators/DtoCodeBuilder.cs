@@ -199,8 +199,8 @@ internal static class DtoCodeBuilder
                 sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.RegularExpression(@\"{escapedPattern}\")]");
             }
 
-            // Add Range validation attribute if min/max values are specified
-            if (property.MinValue != double.MinValue || property.MaxValue != double.MaxValue)
+            // Add Range validation attribute if both min and max values are explicitly set (not at extremes)
+            if (property.MinValue != double.MinValue && property.MaxValue != double.MaxValue)
             {
                 sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.Range({property.MinValue}, {property.MaxValue})]");
             }
