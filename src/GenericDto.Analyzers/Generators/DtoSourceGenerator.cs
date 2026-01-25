@@ -346,6 +346,30 @@ namespace GenericDto.Analyzers
                     propertyTypeDisplay);
                 context.ReportDiagnostic(diagnostic);
             }
+
+            // Validate string length range when both are set
+            if (property.MinLength > 0 && property.MaxLength > 0 && property.MinLength > property.MaxLength)
+            {
+                var diagnostic = Diagnostic.Create(
+                    Diagnostics.DiagnosticDescriptors.InvalidStringValidationRange,
+                    property.SourceProperty.Locations.FirstOrDefault(),
+                    propertyName,
+                    property.MinLength,
+                    property.MaxLength);
+                context.ReportDiagnostic(diagnostic);
+            }
+
+            // Validate numeric range when both are set
+            if (property.MinValue != double.MinValue && property.MaxValue != double.MaxValue && property.MinValue > property.MaxValue)
+            {
+                var diagnostic = Diagnostic.Create(
+                    Diagnostics.DiagnosticDescriptors.InvalidNumericValidationRange,
+                    property.SourceProperty.Locations.FirstOrDefault(),
+                    propertyName,
+                    property.MinValue,
+                    property.MaxValue);
+                context.ReportDiagnostic(diagnostic);
+            }
         }
     }
 }
