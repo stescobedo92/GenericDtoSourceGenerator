@@ -9,4 +9,6 @@ internal static class DiagnosticIds
     public const string DTO005 = "DTO005"; // Circular reference
     public const string DTO006 = "DTO006"; // String validation on non-string property
     public const string DTO007 = "DTO007"; // Numeric validation on non-numeric property
+    public const string DTO008 = "DTO008"; // Invalid string validation range
+    public const string DTO009 = "DTO009"; // Invalid numeric validation range
 }

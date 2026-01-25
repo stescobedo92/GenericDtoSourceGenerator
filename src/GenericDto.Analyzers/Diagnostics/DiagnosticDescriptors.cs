@@ -73,4 +73,24 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Numeric validation attributes like MinValue and MaxValue should only be applied to numeric properties (int, long, double, decimal, etc.)."
     );
+
+    public static readonly DiagnosticDescriptor InvalidStringValidationRange = new(
+        id: DiagnosticIds.DTO008,
+        title: "Invalid string validation range",
+        messageFormat: "Property '{0}' has invalid string length range: MinLength ({1}) cannot be greater than MaxLength ({2}).",
+        category: "GenerateDto",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "MinLength must be less than or equal to MaxLength when both are specified."
+    );
+
+    public static readonly DiagnosticDescriptor InvalidNumericValidationRange = new(
+        id: DiagnosticIds.DTO009,
+        title: "Invalid numeric validation range",
+        messageFormat: "Property '{0}' has invalid numeric range: MinValue ({1}) cannot be greater than MaxValue ({2}).",
+        category: "GenerateDto",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "MinValue must be less than or equal to MaxValue when both are specified."
+    );
 }
