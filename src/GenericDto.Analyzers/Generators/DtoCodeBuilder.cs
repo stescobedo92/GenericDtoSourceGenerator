@@ -161,15 +161,48 @@ internal static class DtoCodeBuilder
     {
         foreach (var property in context.Properties)
         {
-            // Add XML documentation
+            // Add XML documentation - use custom description if provided, otherwise auto-generate
             sb.AppendLine($"/// <summary>");
-            sb.AppendLine($"/// Gets or sets the {property.PropertyName} value.");
+            if (!string.IsNullOrWhiteSpace(property.Description))
+            {
+                sb.AppendLine($"/// {property.Description}");
+            }
+            else
+            {
+                sb.AppendLine($"/// Gets or sets the {property.PropertyName} value.");
+            }
             sb.AppendLine($"/// </summary>");
 
             // Add required attribute if property is non-nullable reference type
             if (property.IsRequired)
             {
                 sb.AppendLine("[global::System.ComponentModel.DataAnnotations.Required]");
+            }
+
+            // Add MaxLength validation attribute if specified
+            if (property.MaxLength > 0)
+            {
+                sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.MaxLength({property.MaxLength})]");
+            }
+
+            // Add MinLength validation attribute if specified
+            if (property.MinLength > 0)
+            {
+                sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.MinLength({property.MinLength})]");
+            }
+
+            // Add RegularExpression validation attribute if pattern is specified
+            if (!string.IsNullOrWhiteSpace(property.Pattern))
+            {
+                // Escape quotes for verbatim string literal (backslashes don't need escaping with @"...")
+                var escapedPattern = property.Pattern!.Replace("\"", "\"\"");
+                sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.RegularExpression(@\"{escapedPattern}\")]");
+            }
+
+            // Add Range validation attribute if both min and max values are explicitly set (not at extremes)
+            if (property.MinValue != double.MinValue && property.MaxValue != double.MaxValue)
+            {
+                sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.Range({property.MinValue}, {property.MaxValue})]");
             }
 
             // Build property declaration

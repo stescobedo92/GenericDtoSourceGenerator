@@ -197,7 +197,9 @@ namespace GenericDto.Analyzers
         var dtoPropertyAttr = property.GetAttribute(GeneratorConstants.DtoPropertyAttributeFullName);
 
         // Get custom name from attribute or use original name
-        var propertyName = dtoPropertyAttr?.GetNamedArgument<string>("Name") ?? property.Name;
+        // Handle null, empty strings, and whitespace properly
+        var customName = dtoPropertyAttr?.GetNamedArgument<string>("Name");
+        var propertyName = string.IsNullOrWhiteSpace(customName) ? property.Name : customName!;
 
         // Get the type representation
         var propertyType = GetPropertyTypeString(property.Type, dtoPropertyAttr);
@@ -228,6 +230,14 @@ namespace GenericDto.Analyzers
         // Determine if property is read-only (no setter)
         var isReadOnly = property.SetMethod is null;
 
+        // Get validation properties with proper null handling
+        var description = dtoPropertyAttr?.GetNamedArgument<string>("Description");
+        var maxLength = dtoPropertyAttr?.GetNamedArgument<int?>("MaxLength") ?? -1;
+        var minLength = dtoPropertyAttr?.GetNamedArgument<int?>("MinLength") ?? -1;
+        var pattern = dtoPropertyAttr?.GetNamedArgument<string>("Pattern");
+        var minValue = dtoPropertyAttr?.GetNamedArgument<double?>("MinValue") ?? double.MinValue;
+        var maxValue = dtoPropertyAttr?.GetNamedArgument<double?>("MaxValue") ?? double.MaxValue;
+
         return new PropertyContext(
             propertyName,
             propertyType,
@@ -236,7 +246,13 @@ namespace GenericDto.Analyzers
             defaultValue,
             isRequired,
             isReadOnly,
-            property);
+            property,
+            description,
+            maxLength,
+            minLength,
+            pattern,
+            minValue,
+            maxValue);
     }
 
     private static string GetPropertyTypeString(ITypeSymbol type, AttributeData? dtoPropertyAttr)
