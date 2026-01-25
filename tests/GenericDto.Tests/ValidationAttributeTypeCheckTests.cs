@@ -949,5 +949,115 @@ namespace TestNamespace
     }
 
     #endregion
+
+    #region Invalid Range Validations
+
+    [Fact]
+    public void MinLength_GreaterThan_MaxLength_ReportsError()
+    {
+        // Arrange
+        var source = @"
+using GenericDto.Core.Attributes;
+
+namespace TestNamespace
+{
+    [GenericDto]
+    public class TestModel
+    {
+        [DtoProperty(MinLength = 10, MaxLength = 5)]
+        public string Name { get; set; }
+    }
+}";
+
+        // Act
+        var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Should().ContainSingle(d => d.Id == "DTO008");
+        var diagnostic = diagnostics.Single(d => d.Id == "DTO008");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        diagnostic.GetMessage().Should().Contain("Name");
+        diagnostic.GetMessage().Should().Contain("MinLength");
+    }
+
+    [Fact]
+    public void MinValue_GreaterThan_MaxValue_ReportsError()
+    {
+        // Arrange
+        var source = @"
+using GenericDto.Core.Attributes;
+
+namespace TestNamespace
+{
+    [GenericDto]
+    public class TestModel
+    {
+        [DtoProperty(MinValue = 10, MaxValue = 5)]
+        public int Quantity { get; set; }
+    }
+}";
+
+        // Act
+        var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Should().ContainSingle(d => d.Id == "DTO009");
+        var diagnostic = diagnostics.Single(d => d.Id == "DTO009");
+        diagnostic.Severity.Should().Be(DiagnosticSeverity.Error);
+        diagnostic.GetMessage().Should().Contain("Quantity");
+        diagnostic.GetMessage().Should().Contain("MinValue");
+    }
+
+    [Fact]
+    public void MinLength_Only_DoesNotReportRangeError()
+    {
+        // Arrange
+        var source = @"
+using GenericDto.Core.Attributes;
+
+namespace TestNamespace
+{
+    [GenericDto]
+    public class TestModel
+    {
+        [DtoProperty(MinLength = 2)]
+        public string Name { get; set; }
+    }
+}";
+
+        // Act
+        var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Should().NotContain(d => d.Id == "DTO008");
+        generatedSources.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void MaxValue_Only_DoesNotReportRangeError()
+    {
+        // Arrange
+        var source = @"
+using GenericDto.Core.Attributes;
+
+namespace TestNamespace
+{
+    [GenericDto]
+    public class TestModel
+    {
+        [DtoProperty(MaxValue = 10)]
+        public int Quantity { get; set; }
+    }
+}";
+
+        // Act
+        var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        diagnostics.Should().NotContain(d => d.Id == "DTO009");
+        generatedSources.Should().NotBeEmpty();
+    }
+
+    #endregion
 }
 
