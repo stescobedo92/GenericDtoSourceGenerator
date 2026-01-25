@@ -53,4 +53,24 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Circular references may cause serialization issues."
     );
+
+    public static readonly DiagnosticDescriptor StringValidationOnNonStringProperty = new(
+        id: DiagnosticIds.DTO006,
+        title: "String validation attribute applied to non-string property",
+        messageFormat: "Property '{0}' of type '{1}' cannot use string validation attributes (MaxLength, MinLength, or Pattern). These attributes are only valid for string properties.",
+        category: "GenerateDto",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "String validation attributes like MaxLength, MinLength, and Pattern should only be applied to string properties."
+    );
+
+    public static readonly DiagnosticDescriptor NumericValidationOnNonNumericProperty = new(
+        id: DiagnosticIds.DTO007,
+        title: "Numeric validation attribute applied to non-numeric property",
+        messageFormat: "Property '{0}' of type '{1}' cannot use numeric validation attributes (MinValue or MaxValue). These attributes are only valid for numeric properties.",
+        category: "GenerateDto",
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        description: "Numeric validation attributes like MinValue and MaxValue should only be applied to numeric properties (int, long, double, decimal, etc.)."
+    );
 }
