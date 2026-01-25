@@ -300,6 +300,9 @@ namespace GenericDto.Analyzers
 
             generatedDtos[fullName] = dtoContext;
 
+            // Validate properties and report diagnostics for validation attribute misuse
+            ValidatePropertyValidationAttributes(dtoContext, context);
+
             // Generate the DTO code
             var code = DtoCodeBuilder.GenerateDto(dtoContext);
             var fileName = $"{dtoContext.TargetNamespace}.{dtoContext.DtoClassName}.g.cs";
@@ -309,6 +312,40 @@ namespace GenericDto.Analyzers
             var mapperCode = MapperCodeBuilder.GenerateMapper(dtoContext);
             var mapperFileName = $"{dtoContext.TargetNamespace}.{dtoContext.DtoClassName}Mapper.g.cs";
             context.AddSource(mapperFileName, SourceText.From(mapperCode, Encoding.UTF8));
+        }
+    }
+
+    private static void ValidatePropertyValidationAttributes(DtoGenerationContext dtoContext, SourceProductionContext context)
+    {
+        foreach (var property in dtoContext.Properties)
+        {
+            var propertyType = property.SourceProperty.Type;
+            var propertyName = property.PropertyName;
+            var propertyTypeDisplay = propertyType.ToDisplayString();
+
+            // Check if string validation attributes are applied to non-string properties
+            bool hasStringValidation = property.MaxLength > 0 || property.MinLength > 0 || !string.IsNullOrWhiteSpace(property.Pattern);
+            if (hasStringValidation && !propertyType.IsStringType())
+            {
+                var diagnostic = Diagnostic.Create(
+                    Diagnostics.DiagnosticDescriptors.StringValidationOnNonStringProperty,
+                    property.SourceProperty.Locations.FirstOrDefault(),
+                    propertyName,
+                    propertyTypeDisplay);
+                context.ReportDiagnostic(diagnostic);
+            }
+
+            // Check if numeric validation attributes are applied to non-numeric properties
+            bool hasNumericValidation = property.MinValue != double.MinValue || property.MaxValue != double.MaxValue;
+            if (hasNumericValidation && !propertyType.IsNumericType())
+            {
+                var diagnostic = Diagnostic.Create(
+                    Diagnostics.DiagnosticDescriptors.NumericValidationOnNonNumericProperty,
+                    property.SourceProperty.Locations.FirstOrDefault(),
+                    propertyName,
+                    propertyTypeDisplay);
+                context.ReportDiagnostic(diagnostic);
+            }
         }
     }
 }
