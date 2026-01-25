@@ -202,4 +202,39 @@ internal static class TypeExtensions
 
         return type;
     }
+
+    /// <summary>
+    /// Checks if the type is a string type.
+    /// </summary>
+    public static bool IsStringType(this ITypeSymbol type)
+    {
+        var underlyingType = type.GetUnderlyingType();
+        return underlyingType.SpecialType == SpecialType.System_String;
+    }
+
+    /// <summary>
+    /// Checks if the type is a numeric type (integer or floating-point).
+    /// </summary>
+    public static bool IsNumericType(this ITypeSymbol type)
+    {
+        var underlyingType = type.GetUnderlyingType();
+        
+        switch (underlyingType.SpecialType)
+        {
+            case SpecialType.System_SByte:
+            case SpecialType.System_Byte:
+            case SpecialType.System_Int16:
+            case SpecialType.System_UInt16:
+            case SpecialType.System_Int32:
+            case SpecialType.System_UInt32:
+            case SpecialType.System_Int64:
+            case SpecialType.System_UInt64:
+            case SpecialType.System_Single:
+            case SpecialType.System_Double:
+            case SpecialType.System_Decimal:
+                return true;
+            default:
+                return false;
+        }
+    }
 }

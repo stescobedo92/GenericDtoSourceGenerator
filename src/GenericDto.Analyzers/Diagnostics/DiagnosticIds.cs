@@ -7,4 +7,6 @@ internal static class DiagnosticIds
     public const string DTO003 = "DTO003"; // Duplicate DTO name
     public const string DTO004 = "DTO004"; // Invalid property type
     public const string DTO005 = "DTO005"; // Circular reference
+    public const string DTO006 = "DTO006"; // String validation on non-string property
+    public const string DTO007 = "DTO007"; // Numeric validation on non-numeric property
 }
