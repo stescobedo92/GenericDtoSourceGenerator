@@ -478,4 +478,71 @@ namespace TestNamespace
         dtoSource.Should().NotBeNull();
         dtoSource.Should().Contain("RegularExpression");
     }
+
+    [Fact]
+    public void Should_Report_Diagnostic_For_String_Validation_On_NonString_Property()
+    {
+        // Arrange
+        var source = """
+using GenericDto.Core.Attributes;
+
+namespace TestNamespace
+{
+    [GenericDto]
+    public class Order
+    {
+        public int Id { get; set; }
+        
+        [DtoProperty(MaxLength = 10, Pattern = ".*")]
+        public int Quantity { get; set; }
+    }
+}
+""";
+
+        // Act
+        var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        SourceGeneratorTestHelper.VerifyNoCompilationErrors(compilation);
+        
+        diagnostics.Should().Contain(d => d.Id == "DTO006");
+
+        var dtoSource = SourceGeneratorTestHelper.GetGeneratedSource(generatedSources, "OrderDto.g.cs");
+        dtoSource.Should().NotBeNull();
+        dtoSource.Should().NotContain("MaxLength");
+        dtoSource.Should().NotContain("RegularExpression");
+    }
+
+    [Fact]
+    public void Should_Report_Diagnostic_For_Numeric_Validation_On_NonNumeric_Property()
+    {
+        // Arrange
+        var source = """
+using GenericDto.Core.Attributes;
+
+namespace TestNamespace
+{
+    [GenericDto]
+    public class Product
+    {
+        public int Id { get; set; }
+        
+        [DtoProperty(MinValue = 0, MaxValue = 10)]
+        public string Description { get; set; }
+    }
+}
+""";
+
+        // Act
+        var (compilation, generatedSources, diagnostics) = SourceGeneratorTestHelper.RunGenerator(source);
+
+        // Assert
+        SourceGeneratorTestHelper.VerifyNoCompilationErrors(compilation);
+        
+        diagnostics.Should().Contain(d => d.Id == "DTO007");
+
+        var dtoSource = SourceGeneratorTestHelper.GetGeneratedSource(generatedSources, "ProductDto.g.cs");
+        dtoSource.Should().NotBeNull();
+        dtoSource.Should().NotContain("Range(");
+    }
 }

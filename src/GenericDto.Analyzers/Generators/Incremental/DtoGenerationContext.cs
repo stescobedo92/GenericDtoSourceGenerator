@@ -36,6 +36,7 @@ internal readonly struct PropertyContext
 {
     public string PropertyName { get; }
     public string PropertyType { get; }
+    public ITypeSymbol EffectiveType { get; }
     public bool IsNullable { get; }
     public bool HasDefaultValue { get; }
     public string? DefaultValue { get; }
@@ -52,6 +53,7 @@ internal readonly struct PropertyContext
     public PropertyContext(
         string propertyName,
         string propertyType,
+        ITypeSymbol effectiveType,
         bool isNullable,
         bool hasDefaultValue,
         string? defaultValue,
@@ -67,6 +69,7 @@ internal readonly struct PropertyContext
     {
         PropertyName = propertyName;
         PropertyType = propertyType;
+        EffectiveType = effectiveType;
         IsNullable = isNullable;
         HasDefaultValue = hasDefaultValue;
         DefaultValue = defaultValue;

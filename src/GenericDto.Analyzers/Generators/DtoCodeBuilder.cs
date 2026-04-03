@@ -161,6 +161,10 @@ internal static class DtoCodeBuilder
     {
         foreach (var property in context.Properties)
         {
+            var effectiveType = property.EffectiveType;
+            var isStringType = effectiveType.IsStringType();
+            var isNumericType = effectiveType.IsNumericType();
+
             // Add XML documentation - use custom description if provided, otherwise auto-generate
             sb.AppendLine($"/// <summary>");
             if (!string.IsNullOrWhiteSpace(property.Description))
@@ -180,19 +184,19 @@ internal static class DtoCodeBuilder
             }
 
             // Add MaxLength validation attribute if specified
-            if (property.MaxLength > 0)
+            if (property.MaxLength > 0 && isStringType)
             {
                 sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.MaxLength({property.MaxLength})]");
             }
 
             // Add MinLength validation attribute if specified
-            if (property.MinLength > 0)
+            if (property.MinLength > 0 && isStringType)
             {
                 sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.MinLength({property.MinLength})]");
             }
 
             // Add RegularExpression validation attribute if pattern is specified
-            if (!string.IsNullOrWhiteSpace(property.Pattern))
+            if (!string.IsNullOrWhiteSpace(property.Pattern) && isStringType)
             {
                 // Escape quotes for verbatim string literal (backslashes don't need escaping with @"...")
                 var escapedPattern = property.Pattern!.Replace("\"", "\"\"");
@@ -200,7 +204,7 @@ internal static class DtoCodeBuilder
             }
 
             // Add Range validation attribute if both min and max values are explicitly set (not at extremes)
-            if (property.MinValue != double.MinValue && property.MaxValue != double.MaxValue)
+            if (property.MinValue != double.MinValue && property.MaxValue != double.MaxValue && isNumericType)
             {
                 sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.Range({property.MinValue}, {property.MaxValue})]");
             }
@@ -222,7 +226,7 @@ internal static class DtoCodeBuilder
             {
                 propertyDeclaration += " = default!;";
             }
-            else if (IsStringType(property.PropertyType))
+            else if (isStringType)
             {
                 propertyDeclaration += " = string.Empty;";
             }
@@ -230,13 +234,6 @@ internal static class DtoCodeBuilder
             sb.AppendLine(propertyDeclaration);
             sb.AppendLine();
         }
-    }
-
-    private static bool IsStringType(string propertyType)
-    {
-        return propertyType == "string" || 
-               propertyType == "global::System.String" || 
-               propertyType == "System.String";
     }
 
     private static void WriteConstructors(IndentedStringBuilder sb, DtoGenerationContext context, bool generateParameterless)

@@ -201,8 +201,11 @@ namespace GenericDto.Analyzers
         var customName = dtoPropertyAttr?.GetNamedArgument<string>("Name");
         var propertyName = string.IsNullOrWhiteSpace(customName) ? property.Name : customName!;
 
+        // Determine the effective target type (respecting custom Type overrides)
+        var effectiveType = GetEffectivePropertyType(property, dtoPropertyAttr);
+
         // Get the type representation
-        var propertyType = GetPropertyTypeString(property.Type, dtoPropertyAttr);
+        var propertyType = effectiveType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
         // Check nullability - ForceNullable is now an enum: 0 = Inherit, 1 = True, 2 = False
         var forceNullableValue = dtoPropertyAttr?.GetNamedArgument<int?>("ForceNullable");
@@ -241,6 +244,7 @@ namespace GenericDto.Analyzers
         return new PropertyContext(
             propertyName,
             propertyType,
+            effectiveType,
             isNullable,
             hasDefaultValue,
             defaultValue,
@@ -255,22 +259,23 @@ namespace GenericDto.Analyzers
             maxValue);
     }
 
-    private static string GetPropertyTypeString(ITypeSymbol type, AttributeData? dtoPropertyAttr)
+    private static ITypeSymbol GetEffectivePropertyType(IPropertySymbol property, AttributeData? dtoPropertyAttr)
     {
-        // Check if custom type is specified
         if (dtoPropertyAttr != null)
         {
             var customType = dtoPropertyAttr.NamedArguments
                 .FirstOrDefault(na => na.Key == "Type")
                 .Value;
 
-            if (!customType.IsNull && customType.Value is INamedTypeSymbol customTypeSymbol)
+            if (!customType.IsNull &&
+                customType.Kind == TypedConstantKind.Type &&
+                customType.Value is ITypeSymbol customTypeSymbol)
             {
-                return customTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                return customTypeSymbol;
             }
         }
 
-        return type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        return property.Type;
     }
 
     private static void Execute(Compilation compilation, ImmutableArray<DtoGenerationContext> types, SourceProductionContext context)
@@ -319,7 +324,7 @@ namespace GenericDto.Analyzers
     {
         foreach (var property in dtoContext.Properties)
         {
-            var propertyType = property.SourceProperty.Type;
+            var propertyType = property.EffectiveType;
             var propertyName = property.PropertyName;
             var propertyTypeDisplay = propertyType.ToDisplayString();
 
