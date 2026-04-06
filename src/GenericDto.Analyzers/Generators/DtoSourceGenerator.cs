@@ -228,7 +228,7 @@ namespace GenericDto.Analyzers
         var hasDefaultValue = !string.IsNullOrEmpty(defaultValue);
 
         // Determine if property is required (non-nullable without default value)
-        var isRequired = !isNullable && !hasDefaultValue && !property.Type.IsValueType;
+        var isRequired = !isNullable && !hasDefaultValue && !effectiveType.IsValueType;
 
         // Determine if property is read-only (no setter)
         var isReadOnly = property.SetMethod is null;

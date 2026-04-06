@@ -127,6 +127,11 @@ internal static class MapperCodeBuilder
         foreach (var property in context.Properties)
         {
             var sourcePropertyName = property.SourceProperty.Name;
+            if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, property.SourceProperty.Type))
+            {
+                sb.AppendLine($"// {property.PropertyName}: type overridden to '{property.EffectiveType.ToDisplayString()}' - manual mapping from '{property.SourceProperty.Type.ToDisplayString()}' required.");
+                continue;
+            }
             sb.AppendLine($"{property.PropertyName} = source.{sourcePropertyName},");
         }
 
@@ -173,6 +178,11 @@ internal static class MapperCodeBuilder
             var sourceProperty = property.SourceProperty;
             if (sourceProperty.SetMethod != null && sourceProperty.SetMethod.DeclaredAccessibility == Accessibility.Public)
             {
+                if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, sourceProperty.Type))
+                {
+                    sb.AppendLine($"// {sourceProperty.Name}: type overridden to '{property.EffectiveType.ToDisplayString()}' - manual mapping to '{sourceProperty.Type.ToDisplayString()}' required.");
+                    continue;
+                }
                 sb.AppendLine($"{sourceProperty.Name} = dto.{property.PropertyName},");
             }
         }
@@ -277,6 +287,11 @@ internal static class MapperCodeBuilder
             var sourceProperty = property.SourceProperty;
             if (sourceProperty.SetMethod != null && sourceProperty.SetMethod.DeclaredAccessibility == Accessibility.Public)
             {
+                if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, sourceProperty.Type))
+                {
+                    sb.AppendLine($"// {sourceProperty.Name}: type overridden to '{property.EffectiveType.ToDisplayString()}' - manual mapping to '{sourceProperty.Type.ToDisplayString()}' required.");
+                    continue;
+                }
                 sb.AppendLine($"entity.{sourceProperty.Name} = dto.{property.PropertyName};");
             }
         }
