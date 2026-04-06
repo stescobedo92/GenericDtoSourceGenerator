@@ -128,9 +128,8 @@ namespace TestNamespace
         dtoSource.Should().NotBeNull();
         // Value type override means it cannot be null and is not "required" in the DataAnnotations sense
         dtoSource.Should().Contain("public int Code { get; set; }");
-        // int is a value type - should not have [Required]
-        dtoSource.Should().NotContain("[global::System.ComponentModel.DataAnnotations.Required]\r\npublic int Code");
-        dtoSource.Should().NotContain("[global::System.ComponentModel.DataAnnotations.Required]\npublic int Code");
+        // int is a value type - should not have [Required] immediately before the property declaration
+        dtoSource.Should().NotMatchRegex(@"\[global::System\.ComponentModel\.DataAnnotations\.Required\]\s*public int Code");
     }
 
     [Fact]
