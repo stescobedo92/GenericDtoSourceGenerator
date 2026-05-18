@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using GenericDto.Analyzers.Constants;
+using GenericDto.Analyzers.Diagnostics;
 using GenericDto.Analyzers.Extensions;
 using GenericDto.Analyzers.Generators.Incremental;
 using Microsoft.CodeAnalysis;
@@ -22,70 +23,46 @@ public sealed class DtoSourceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // Register the attribute source (embedded in the generator output)
         context.RegisterPostInitializationOutput(ctx => ctx.AddSource(
             "GenericDtoAttributeMarker.g.cs",
             SourceText.From(GenerateAttributeMarker(), Encoding.UTF8)));
 
-        // Create a provider for types with the GenericDto attribute using CreateSyntaxProvider
-        var typeDeclarations = context.SyntaxProvider
-            .CreateSyntaxProvider(
-                predicate: static (node, _) => IsCandidateForGeneration(node),
-                transform: static (ctx, ct) => GetDtoGenerationContextFromSyntax(ctx, ct))
-            .Where(static m => m is not null)
-            .Select(static (m, _) => m!.Value);
+        var dtoContexts = context.SyntaxProvider.ForAttributeWithMetadataName(
+            fullyQualifiedMetadataName: GeneratorConstants.GenericDtoCoreAttributeFullName,
+            predicate: static (node, _) => node is TypeDeclarationSyntax,
+            transform: static (ctx, ct) => GetDtoGenerationContexts(ctx, ct));
 
-        // Combine with compilation
-        var compilationAndTypes = context.CompilationProvider.Combine(typeDeclarations.Collect());
-
-        // Register the source output
-        context.RegisterSourceOutput(compilationAndTypes, static (spc, source) => Execute(source.Left, source.Right, spc));
+        context.RegisterSourceOutput(dtoContexts.Collect(), static (spc, source) => Execute(source, spc));
     }
 
-    private static bool IsCandidateForGeneration(SyntaxNode node)
+    private static ImmutableArray<DtoGenerationContext> GetDtoGenerationContexts(
+        GeneratorAttributeSyntaxContext context,
+        CancellationToken cancellationToken)
     {
-        // Check if the node is a type declaration with attributes
-        if (node is not TypeDeclarationSyntax typeDeclaration)
-            return false;
+        cancellationToken.ThrowIfCancellationRequested();
 
-        // Must have attributes
-        if (typeDeclaration.AttributeLists.Count == 0)
-            return false;
+        if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
+            return ImmutableArray<DtoGenerationContext>.Empty;
 
-        // Check if any attribute looks like GenericDto
-        foreach (var attributeList in typeDeclaration.AttributeLists)
+        var builder = ImmutableArray.CreateBuilder<DtoGenerationContext>();
+        foreach (var attribute in context.Attributes.Where(IsGenericDtoAttribute))
         {
-            foreach (var attribute in attributeList.Attributes)
-            {
-                var name = attribute.Name.ToString();
-                if (name == "GenericDto" || name == "GenericDtoAttribute" || 
-                    name.EndsWith(".GenericDto") || name.EndsWith(".GenericDtoAttribute"))
-                {
-                    return true;
-                }
-            }
+            builder.Add(CreateDtoGenerationContext(typeSymbol, attribute, cancellationToken));
         }
 
-        return false;
+        return builder.ToImmutable();
     }
 
-    private static DtoGenerationContext? GetDtoGenerationContextFromSyntax(GeneratorSyntaxContext context, CancellationToken cancellationToken)
+    private static bool IsGenericDtoAttribute(AttributeData attribute)
     {
-        var typeDeclaration = (TypeDeclarationSyntax)context.Node;
-        var semanticModel = context.SemanticModel;
+        return attribute.AttributeClass?.ToDisplayString() == GeneratorConstants.GenericDtoCoreAttributeFullName;
+    }
 
-        var typeSymbol = semanticModel.GetDeclaredSymbol(typeDeclaration, cancellationToken) as INamedTypeSymbol;
-        if (typeSymbol is null)
-            return null;
-
-        // Find the GenericDto attribute
-        var attribute = typeSymbol.GetAttributes()
-            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == GeneratorConstants.GenericDtoCoreAttributeFullName);
-
-        if (attribute is null)
-            return null;
-
-        // Extract attribute values
+    private static DtoGenerationContext CreateDtoGenerationContext(
+        INamedTypeSymbol typeSymbol,
+        AttributeData attribute,
+        CancellationToken cancellationToken)
+    {
         var dtoName = attribute.GetNamedArgument<string>("DtoName");
         var targetNamespace = attribute.GetNamedArgument<string>("Namespace");
         var useRecord = attribute.GetNamedArgument<bool?>("UseRecord") ?? false;
@@ -93,26 +70,64 @@ public sealed class DtoSourceGenerator : IIncrementalGenerator
         var generateParameterlessConstructor = attribute.GetNamedArgument<bool?>("GenerateParameterlessConstructor") ?? true;
         var implementIEquatable = attribute.GetNamedArgument<bool?>("ImplementIEquatable") ?? false;
         var implementIValidatableObject = attribute.GetNamedArgument<bool?>("ImplementIValidatableObject") ?? false;
+        var includeInheritedProperties = attribute.GetNamedArgument<bool?>("IncludeInheritedProperties") ?? true;
+        var generateDocumentation = attribute.GetNamedArgument<bool?>("GenerateDocumentation") ?? true;
+        var generateMappers = attribute.GetNamedArgument<bool?>("GenerateMappers") ?? true;
+        var generateToDto = attribute.GetNamedArgument<bool?>("GenerateToDto") ?? true;
+        var generateToEntity = attribute.GetNamedArgument<bool?>("GenerateToEntity") ?? true;
+        var generateUpdateFrom = attribute.GetNamedArgument<bool?>("GenerateUpdateFrom") ?? true;
+        var generateCollectionMappers = attribute.GetNamedArgument<bool?>("GenerateCollectionMappers") ?? true;
+        var generateToString = attribute.GetNamedArgument<bool?>("GenerateToString") ?? true;
+        var useInitOnlyProperties = attribute.GetNamedArgument<bool?>("UseInitOnlyProperties") ?? false;
+        var useRequiredMembers = attribute.GetNamedArgument<bool?>("UseRequiredMembers") ?? false;
+        var generateJsonAttributes = attribute.GetNamedArgument<bool?>("GenerateJsonAttributes") ?? true;
 
-        // Determine DTO name
         var finalDtoName = string.IsNullOrWhiteSpace(dtoName)
             ? typeSymbol.Name + GeneratorConstants.DtoSuffix
-            : dtoName;
+            : dtoName!;
 
-        // Determine namespace
+        var sourceNamespace = typeSymbol.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : typeSymbol.ContainingNamespace.ToDisplayString();
+
         var finalNamespace = string.IsNullOrWhiteSpace(targetNamespace)
-            ? typeSymbol.ContainingNamespace.ToDisplayString() + GeneratorConstants.DtoNamespaceSuffix
-            : targetNamespace;
+            ? string.IsNullOrWhiteSpace(sourceNamespace) ? "Dto" : sourceNamespace + GeneratorConstants.DtoNamespaceSuffix
+            : targetNamespace!;
 
-        // Collect properties
-        var properties = CollectProperties(typeSymbol, cancellationToken);
+        var mapperNamespace = attribute.GetNamedArgument<string>("MapperNamespace");
+        var finalMapperNamespace = string.IsNullOrWhiteSpace(mapperNamespace) ? finalNamespace : mapperNamespace!;
+
+        var mapperClassName = attribute.GetNamedArgument<string>("MapperClassName");
+        var finalMapperClassName = string.IsNullOrWhiteSpace(mapperClassName)
+            ? finalDtoName + "MapperExtensions"
+            : mapperClassName!;
+
+        var properties = CollectProperties(typeSymbol, includeInheritedProperties, cancellationToken);
 
         return new DtoGenerationContext(
             typeSymbol,
             attribute,
-            finalNamespace!,
-            finalDtoName!,
-            properties);
+            finalNamespace,
+            finalDtoName,
+            finalMapperNamespace,
+            finalMapperClassName,
+            properties,
+            useRecord,
+            accessModifier,
+            generateParameterlessConstructor,
+            implementIEquatable,
+            implementIValidatableObject,
+            includeInheritedProperties,
+            generateDocumentation,
+            generateMappers,
+            generateToDto,
+            generateToEntity,
+            generateUpdateFrom,
+            generateCollectionMappers,
+            generateToString,
+            useInitOnlyProperties,
+            useRequiredMembers,
+            generateJsonAttributes);
     }
 
     private static string GenerateAttributeMarker()
@@ -130,13 +145,16 @@ namespace GenericDto.Analyzers
 ";
     }
 
-    private static List<PropertyContext> CollectProperties(INamedTypeSymbol typeSymbol, CancellationToken cancellationToken)
+    private static ImmutableArray<PropertyContext> CollectProperties(
+        INamedTypeSymbol typeSymbol,
+        bool includeInheritedProperties,
+        CancellationToken cancellationToken)
     {
-        var properties = new List<PropertyContext>();
+        var properties = new List<(PropertyContext Property, int Index)>();
         var processedNames = new HashSet<string>(StringComparer.Ordinal);
-
-        // Get properties from the type and its base types
         var currentType = typeSymbol;
+        var index = 0;
+
         while (currentType != null && currentType.SpecialType != SpecialType.System_Object)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -146,100 +164,72 @@ namespace GenericDto.Analyzers
                 if (member is not IPropertySymbol propertySymbol)
                     continue;
 
-                // Skip if already processed (overridden properties)
                 if (!processedNames.Add(propertySymbol.Name))
                     continue;
 
-                // Skip if property should be ignored
                 if (ShouldIgnoreProperty(propertySymbol))
                     continue;
 
-                // Skip non-public properties, static properties, indexers
                 if (propertySymbol.DeclaredAccessibility != Accessibility.Public ||
                     propertySymbol.IsStatic ||
-                    propertySymbol.IsIndexer)
+                    propertySymbol.IsIndexer ||
+                    propertySymbol.GetMethod is null)
                     continue;
 
-                // Skip write-only properties
-                if (propertySymbol.GetMethod is null)
-                    continue;
-
-                var propertyContext = CreatePropertyContext(propertySymbol);
-                properties.Add(propertyContext);
+                properties.Add((CreatePropertyContext(propertySymbol), index++));
             }
+
+            if (!includeInheritedProperties)
+                break;
 
             currentType = currentType.BaseType;
         }
 
-        return properties;
+        return properties
+            .OrderBy(p => p.Property.Order)
+            .ThenBy(p => p.Index)
+            .Select(p => p.Property)
+            .ToImmutableArray();
     }
 
     private static bool ShouldIgnoreProperty(IPropertySymbol property)
     {
-        // Check for DtoIgnore attribute
         if (property.HasAttribute(GeneratorConstants.DtoIgnoreAttributeFullName))
             return true;
 
-        // Check for DtoProperty attribute with Ignore = true
         var dtoPropertyAttr = property.GetAttribute(GeneratorConstants.DtoPropertyAttributeFullName);
-        if (dtoPropertyAttr != null)
-        {
-            var ignore = dtoPropertyAttr.GetNamedArgument<bool?>("Ignore");
-            if (ignore == true)
-                return true;
-        }
-
-        return false;
+        return dtoPropertyAttr?.GetNamedArgument<bool?>("Ignore") == true;
     }
 
     private static PropertyContext CreatePropertyContext(IPropertySymbol property)
     {
         var dtoPropertyAttr = property.GetAttribute(GeneratorConstants.DtoPropertyAttributeFullName);
-
-        // Get custom name from attribute or use original name
-        // Handle null, empty strings, and whitespace properly
         var customName = dtoPropertyAttr?.GetNamedArgument<string>("Name");
         var propertyName = string.IsNullOrWhiteSpace(customName) ? property.Name : customName!;
-
-        // Determine the effective target type (respecting custom Type overrides)
         var effectiveType = GetEffectivePropertyType(property, dtoPropertyAttr);
-
-        // Get the type representation
         var propertyType = effectiveType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
 
-        // Check nullability - ForceNullable is now an enum: 0 = Inherit, 1 = True, 2 = False
         var forceNullableValue = dtoPropertyAttr?.GetNamedArgument<int?>("ForceNullable");
         bool isNullable;
-        if (forceNullableValue.HasValue && forceNullableValue.Value == 1) // NullableOption.True
-        {
+        if (forceNullableValue == 1)
             isNullable = true;
-        }
-        else if (forceNullableValue.HasValue && forceNullableValue.Value == 2) // NullableOption.False
-        {
+        else if (forceNullableValue == 2)
             isNullable = false;
-        }
-        else // NullableOption.Inherit or not specified
-        {
-            isNullable = property.Type.IsNullable();
-        }
+        else
+            isNullable = effectiveType.IsNullable();
 
-        // Get default value
         var defaultValue = dtoPropertyAttr?.GetNamedArgument<string>("DefaultValue");
-        var hasDefaultValue = !string.IsNullOrEmpty(defaultValue);
-
-        // Determine if property is required (non-nullable without default value)
-        var isRequired = !isNullable && !hasDefaultValue && !effectiveType.IsValueType;
-
-        // Determine if property is read-only (no setter)
-        var isReadOnly = property.SetMethod is null;
-
-        // Get validation properties with proper null handling
+        var hasDefaultValue = !string.IsNullOrWhiteSpace(defaultValue);
+        var validations = GetValidationContexts(property);
+        var isRequired = (!isNullable && !hasDefaultValue && !effectiveType.IsValueType) ||
+                         validations.Any(v => v.Required);
         var description = dtoPropertyAttr?.GetNamedArgument<string>("Description");
         var maxLength = dtoPropertyAttr?.GetNamedArgument<int?>("MaxLength") ?? -1;
         var minLength = dtoPropertyAttr?.GetNamedArgument<int?>("MinLength") ?? -1;
         var pattern = dtoPropertyAttr?.GetNamedArgument<string>("Pattern");
         var minValue = dtoPropertyAttr?.GetNamedArgument<double?>("MinValue") ?? double.MinValue;
         var maxValue = dtoPropertyAttr?.GetNamedArgument<double?>("MaxValue") ?? double.MaxValue;
+        var order = dtoPropertyAttr?.GetNamedArgument<int?>("Order") ?? 0;
 
         return new PropertyContext(
             propertyName,
@@ -249,75 +239,145 @@ namespace GenericDto.Analyzers
             hasDefaultValue,
             defaultValue,
             isRequired,
-            isReadOnly,
+            property.SetMethod is null,
             property,
             description,
             maxLength,
             minLength,
             pattern,
             minValue,
-            maxValue);
+            maxValue,
+            order,
+            validations,
+            dtoPropertyAttr?.GetNamedArgument<string>("MapFrom"),
+            dtoPropertyAttr?.GetNamedArgument<string>("MapTo"),
+            GetNamedTypeArgument(dtoPropertyAttr, "ConverterType"),
+            dtoPropertyAttr?.GetNamedArgument<string>("ConverterMethod"),
+            dtoPropertyAttr?.GetNamedArgument<bool?>("IgnoreReverseMap") ?? false,
+            dtoPropertyAttr?.GetNamedArgument<bool?>("Flatten") ?? false,
+            dtoPropertyAttr?.GetNamedArgument<bool?>("Sensitive") ?? false,
+            dtoPropertyAttr?.GetNamedArgument<bool?>("JsonIgnore") ?? false,
+            dtoPropertyAttr?.GetNamedArgument<string>("JsonPropertyName"),
+            GetNamedTypeArgument(dtoPropertyAttr, "JsonConverterType"));
+    }
+
+    private static ImmutableArray<ValidationContext> GetValidationContexts(IPropertySymbol property)
+    {
+        return property.GetAttributes(GeneratorConstants.DtoValidationAttributeFullName)
+            .Select(attribute => new ValidationContext(
+                attribute.GetNamedArgument<bool?>("Required") ?? false,
+                attribute.GetNamedArgument<bool?>("EmailAddress") ?? false,
+                attribute.GetNamedArgument<bool?>("Phone") ?? false,
+                attribute.GetNamedArgument<bool?>("Url") ?? false,
+                attribute.GetNamedArgument<bool?>("CreditCard") ?? false,
+                attribute.GetNamedArgument<string>("ErrorMessage"),
+                attribute.GetNamedArgument<string>("CompareProperty"),
+                GetNamedTypeArgument(attribute, "CustomValidationType"),
+                attribute.GetNamedArgument<string>("CustomValidationMethod")))
+            .ToImmutableArray();
+    }
+
+    private static string? GetNamedTypeArgument(AttributeData? attribute, string argumentName)
+    {
+        if (attribute is null)
+            return null;
+
+        var value = attribute.NamedArguments
+            .FirstOrDefault(na => na.Key == argumentName)
+            .Value;
+
+        if (!value.IsNull &&
+            value.Kind == TypedConstantKind.Type &&
+            value.Value is ITypeSymbol typeSymbol)
+        {
+            return typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        }
+
+        return null;
     }
 
     private static ITypeSymbol GetEffectivePropertyType(IPropertySymbol property, AttributeData? dtoPropertyAttr)
     {
-        if (dtoPropertyAttr != null)
-        {
-            var customType = dtoPropertyAttr.NamedArguments
-                .FirstOrDefault(na => na.Key == "Type")
-                .Value;
+        var customTypeName = GetNamedTypeArgument(dtoPropertyAttr, "Type");
+        if (customTypeName is null || dtoPropertyAttr is null)
+            return property.Type;
 
-            if (!customType.IsNull &&
-                customType.Kind == TypedConstantKind.Type &&
-                customType.Value is ITypeSymbol customTypeSymbol)
-            {
-                return customTypeSymbol;
-            }
-        }
+        var customType = dtoPropertyAttr.NamedArguments
+            .FirstOrDefault(na => na.Key == "Type")
+            .Value;
 
-        return property.Type;
+        return customType.Value is ITypeSymbol customTypeSymbol ? customTypeSymbol : property.Type;
     }
 
-    private static void Execute(Compilation compilation, ImmutableArray<DtoGenerationContext> types, SourceProductionContext context)
+    private static void Execute(ImmutableArray<ImmutableArray<DtoGenerationContext>> groupedTypes, SourceProductionContext context)
     {
-        if (types.IsDefaultOrEmpty)
+        if (groupedTypes.IsDefaultOrEmpty)
             return;
 
-        // Track generated DTO names to detect duplicates
-        var generatedDtos = new Dictionary<string, DtoGenerationContext>();
-
-        foreach (var dtoContext in types)
+        var generatedDtos = new Dictionary<string, DtoGenerationContext>(StringComparer.Ordinal);
+        foreach (var dtoContext in groupedTypes.SelectMany(g => g))
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
             var fullName = $"{dtoContext.TargetNamespace}.{dtoContext.DtoClassName}";
-
-            // Check for duplicate DTO names
-            if (generatedDtos.TryGetValue(fullName, out var existing))
+            if (generatedDtos.ContainsKey(fullName))
             {
-                var diagnostic = Diagnostic.Create(
-                    Diagnostics.DiagnosticDescriptors.DuplicateDtoName,
-                    dtoContext.SourceType.Locations.FirstOrDefault(),
-                    dtoContext.DtoClassName);
-                context.ReportDiagnostic(diagnostic);
+                Report(context, DiagnosticDescriptors.DuplicateDtoName, dtoContext.SourceType.Locations.FirstOrDefault(), dtoContext.DtoClassName);
                 continue;
             }
 
             generatedDtos[fullName] = dtoContext;
-
-            // Validate properties and report diagnostics for validation attribute misuse
+            ValidateConfiguration(dtoContext, context);
             ValidatePropertyValidationAttributes(dtoContext, context);
 
-            // Generate the DTO code
             var code = DtoCodeBuilder.GenerateDto(dtoContext);
-            var fileName = $"{dtoContext.TargetNamespace}.{dtoContext.DtoClassName}.g.cs";
-            context.AddSource(fileName, SourceText.From(code, Encoding.UTF8));
+            context.AddSource($"{SanitizeHintName(fullName)}.g.cs", SourceText.From(code, Encoding.UTF8));
 
-            // Generate mapper extension methods
-            var mapperCode = MapperCodeBuilder.GenerateMapper(dtoContext);
-            var mapperFileName = $"{dtoContext.TargetNamespace}.{dtoContext.DtoClassName}Mapper.g.cs";
-            context.AddSource(mapperFileName, SourceText.From(mapperCode, Encoding.UTF8));
+            if (dtoContext.GenerateMappers)
+            {
+                var mapperCode = MapperCodeBuilder.GenerateMapper(dtoContext);
+                context.AddSource($"{SanitizeHintName(fullName)}Mapper.g.cs", SourceText.From(mapperCode, Encoding.UTF8));
+            }
         }
+    }
+
+    private static void ValidateConfiguration(DtoGenerationContext dtoContext, SourceProductionContext context)
+    {
+        if (dtoContext.AccessModifier is not ("public" or "internal"))
+        {
+            Report(context, DiagnosticDescriptors.InvalidDtoConfiguration, dtoContext.SourceType.Locations.FirstOrDefault(),
+                "AccessModifier must be either \"public\" or \"internal\" for generated namespace-level DTOs.");
+        }
+
+        if (!SyntaxFacts.IsValidIdentifier(dtoContext.DtoClassName))
+        {
+            Report(context, DiagnosticDescriptors.InvalidDtoConfiguration, dtoContext.SourceType.Locations.FirstOrDefault(),
+                $"DtoName '{dtoContext.DtoClassName}' is not a valid C# identifier.");
+        }
+
+        if (!SyntaxFacts.IsValidIdentifier(dtoContext.MapperClassName))
+        {
+            Report(context, DiagnosticDescriptors.InvalidDtoConfiguration, dtoContext.SourceType.Locations.FirstOrDefault(),
+                $"MapperClassName '{dtoContext.MapperClassName}' is not a valid C# identifier.");
+        }
+
+        if (!IsValidNamespace(dtoContext.TargetNamespace))
+        {
+            Report(context, DiagnosticDescriptors.InvalidDtoConfiguration, dtoContext.SourceType.Locations.FirstOrDefault(),
+                $"Namespace '{dtoContext.TargetNamespace}' is not a valid C# namespace.");
+        }
+
+        if (!IsValidNamespace(dtoContext.MapperNamespace))
+        {
+            Report(context, DiagnosticDescriptors.InvalidDtoConfiguration, dtoContext.SourceType.Locations.FirstOrDefault(),
+                $"MapperNamespace '{dtoContext.MapperNamespace}' is not a valid C# namespace.");
+        }
+    }
+
+    private static bool IsValidNamespace(string value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+               value.Split('.').All(part => SyntaxFacts.IsValidIdentifier(part));
     }
 
     private static void ValidatePropertyValidationAttributes(DtoGenerationContext dtoContext, SourceProductionContext context)
@@ -328,53 +388,50 @@ namespace GenericDto.Analyzers
             var propertyName = property.PropertyName;
             var propertyTypeDisplay = propertyType.ToDisplayString();
 
-            // Check if string validation attributes are applied to non-string properties
-            bool hasStringValidation = property.MaxLength > 0 || property.MinLength > 0 || !string.IsNullOrWhiteSpace(property.Pattern);
+            var hasStringValidation = property.MaxLength > 0 ||
+                                      property.MinLength > 0 ||
+                                      !string.IsNullOrWhiteSpace(property.Pattern) ||
+                                      property.Validations.Any(v => v.EmailAddress || v.Phone || v.Url || v.CreditCard);
             if (hasStringValidation && !propertyType.IsStringType())
             {
-                var diagnostic = Diagnostic.Create(
-                    Diagnostics.DiagnosticDescriptors.StringValidationOnNonStringProperty,
-                    property.SourceProperty.Locations.FirstOrDefault(),
-                    propertyName,
-                    propertyTypeDisplay);
-                context.ReportDiagnostic(diagnostic);
+                Report(context, DiagnosticDescriptors.StringValidationOnNonStringProperty,
+                    property.SourceProperty.Locations.FirstOrDefault(), propertyName, propertyTypeDisplay);
             }
 
-            // Check if numeric validation attributes are applied to non-numeric properties
-            bool hasNumericValidation = property.MinValue != double.MinValue || property.MaxValue != double.MaxValue;
+            var hasNumericValidation = property.MinValue != double.MinValue || property.MaxValue != double.MaxValue;
             if (hasNumericValidation && !propertyType.IsNumericType())
             {
-                var diagnostic = Diagnostic.Create(
-                    Diagnostics.DiagnosticDescriptors.NumericValidationOnNonNumericProperty,
-                    property.SourceProperty.Locations.FirstOrDefault(),
-                    propertyName,
-                    propertyTypeDisplay);
-                context.ReportDiagnostic(diagnostic);
+                Report(context, DiagnosticDescriptors.NumericValidationOnNonNumericProperty,
+                    property.SourceProperty.Locations.FirstOrDefault(), propertyName, propertyTypeDisplay);
             }
 
-            // Validate string length range when both are set
             if (property.MinLength > 0 && property.MaxLength > 0 && property.MinLength > property.MaxLength)
             {
-                var diagnostic = Diagnostic.Create(
-                    Diagnostics.DiagnosticDescriptors.InvalidStringValidationRange,
-                    property.SourceProperty.Locations.FirstOrDefault(),
-                    propertyName,
-                    property.MinLength,
-                    property.MaxLength);
-                context.ReportDiagnostic(diagnostic);
+                Report(context, DiagnosticDescriptors.InvalidStringValidationRange,
+                    property.SourceProperty.Locations.FirstOrDefault(), propertyName, property.MinLength, property.MaxLength);
             }
 
-            // Validate numeric range when both are set
             if (property.MinValue != double.MinValue && property.MaxValue != double.MaxValue && property.MinValue > property.MaxValue)
             {
-                var diagnostic = Diagnostic.Create(
-                    Diagnostics.DiagnosticDescriptors.InvalidNumericValidationRange,
-                    property.SourceProperty.Locations.FirstOrDefault(),
-                    propertyName,
-                    property.MinValue,
-                    property.MaxValue);
-                context.ReportDiagnostic(diagnostic);
+                Report(context, DiagnosticDescriptors.InvalidNumericValidationRange,
+                    property.SourceProperty.Locations.FirstOrDefault(), propertyName, property.MinValue, property.MaxValue);
             }
         }
+    }
+
+    private static void Report(SourceProductionContext context, DiagnosticDescriptor descriptor, Location? location, params object[] args)
+    {
+        context.ReportDiagnostic(Diagnostic.Create(descriptor, location, args));
+    }
+
+    private static string SanitizeHintName(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var ch in value)
+        {
+            builder.Append(char.IsLetterOrDigit(ch) || ch == '.' || ch == '_' ? ch : '_');
+        }
+
+        return builder.ToString();
     }
 }

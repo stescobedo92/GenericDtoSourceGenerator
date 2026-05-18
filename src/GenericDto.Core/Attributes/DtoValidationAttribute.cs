@@ -63,7 +63,13 @@ public sealed class DtoValidationAttribute : Attribute
 
     /// <summary>
     /// Gets or sets a custom validation type.
-    /// The type must implement IValidatableObject or ValidationAttribute.
+    /// The type must expose a static validation method compatible with CustomValidationAttribute.
     /// </summary>
     public Type? CustomValidationType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the static validation method name used with CustomValidationAttribute.
+    /// Default is "IsValid".
+    /// </summary>
+    public string CustomValidationMethod { get; set; } = "IsValid";
 }

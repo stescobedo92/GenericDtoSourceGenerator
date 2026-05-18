@@ -16,7 +16,6 @@ internal static class DtoCodeBuilder
 {
     public static string GenerateDto(DtoGenerationContext context)
     {
-        var sb = new StringBuilder();
         var indent = new IndentedStringBuilder();
 
         // File header
@@ -36,15 +35,8 @@ internal static class DtoCodeBuilder
         indent.AppendLine("{");
         indent.IncreaseIndent();
 
-        // Get attribute options
-        var useRecord = context.GenerateDtoAttribute.GetNamedArgument<bool?>("UseRecord") ?? false;
-        var accessModifier = context.GenerateDtoAttribute.GetNamedArgument<string>("AccessModifier") ?? "public";
-        var implementIEquatable = context.GenerateDtoAttribute.GetNamedArgument<bool?>("ImplementIEquatable") ?? false;
-        var implementIValidatableObject = context.GenerateDtoAttribute.GetNamedArgument<bool?>("ImplementIValidatableObject") ?? false;
-        var generateParameterlessConstructor = context.GenerateDtoAttribute.GetNamedArgument<bool?>("GenerateParameterlessConstructor") ?? true;
-
         // Class/Record declaration
-        WriteTypeDeclaration(indent, context, useRecord, accessModifier, implementIEquatable, implementIValidatableObject);
+        WriteTypeDeclaration(indent, context);
         indent.AppendLine("{");
         indent.IncreaseIndent();
 
@@ -53,25 +45,25 @@ internal static class DtoCodeBuilder
         indent.AppendLine();
 
         // Constructors
-        if (!useRecord)
+        if (!context.UseRecord)
         {
-            WriteConstructors(indent, context, generateParameterlessConstructor);
+            WriteConstructors(indent, context);
         }
 
         // IEquatable implementation
-        if (implementIEquatable && !useRecord)
+        if (context.ImplementIEquatable && !context.UseRecord)
         {
             WriteIEquatableImplementation(indent, context);
         }
 
         // IValidatableObject implementation
-        if (implementIValidatableObject)
+        if (context.ImplementIValidatableObject)
         {
             WriteIValidatableObjectImplementation(indent, context);
         }
 
         // ToString override
-        if (!useRecord)
+        if (!context.UseRecord && context.GenerateToString)
         {
             WriteToStringOverride(indent, context);
         }
@@ -103,16 +95,12 @@ internal static class DtoCodeBuilder
             usings.Add(usingStr);
         }
 
-        // Add IEquatable using if needed
-        var implementIEquatable = context.GenerateDtoAttribute.GetNamedArgument<bool?>("ImplementIEquatable") ?? false;
-        if (implementIEquatable)
+        if (context.ImplementIEquatable)
         {
             usings.Add("System");
         }
 
-        // Add IValidatableObject using if needed  
-        var implementIValidatable = context.GenerateDtoAttribute.GetNamedArgument<bool?>("ImplementIValidatableObject") ?? false;
-        if (implementIValidatable)
+        if (context.ImplementIValidatableObject)
         {
             usings.Add("System.ComponentModel.DataAnnotations");
         }
@@ -125,36 +113,35 @@ internal static class DtoCodeBuilder
     }
 
     private static void WriteTypeDeclaration(
-        IndentedStringBuilder sb, 
-        DtoGenerationContext context, 
-        bool useRecord, 
-        string accessModifier,
-        bool implementIEquatable,
-        bool implementIValidatableObject)
+        IndentedStringBuilder sb,
+        DtoGenerationContext context)
     {
         var interfaces = new List<string>();
 
-        if (implementIEquatable)
+        if (context.ImplementIEquatable && !context.UseRecord)
         {
             interfaces.Add($"global::System.IEquatable<{context.DtoClassName}>");
         }
 
-        if (implementIValidatableObject)
+        if (context.ImplementIValidatableObject)
         {
             interfaces.Add("global::System.ComponentModel.DataAnnotations.IValidatableObject");
         }
 
         var inheritance = interfaces.Count > 0 ? $" : {string.Join(", ", interfaces)}" : "";
 
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// DTO class generated from <see cref=\"{context.SourceType.ToDisplayString()}\"/>.");
-        sb.AppendLine("/// </summary>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// DTO class generated from <see cref=\"{context.SourceType.ToDisplayString()}\"/>.");
+            sb.AppendLine("/// </summary>");
+        }
         sb.AppendLine("[global::System.CodeDom.Compiler.GeneratedCodeAttribute(\"GenericDto.Analyzers\", \"1.0.0\")]");
         sb.AppendLine("[global::System.Diagnostics.DebuggerNonUserCodeAttribute]");
         sb.AppendLine("[global::System.Runtime.CompilerServices.CompilerGeneratedAttribute]");
 
-        var typeKeyword = useRecord ? "record" : "partial class";
-        sb.AppendLine($"{accessModifier} {typeKeyword} {context.DtoClassName}{inheritance}");
+        var typeKeyword = context.UseRecord ? "record" : "partial class";
+        sb.AppendLine($"{context.AccessModifier} {typeKeyword} {context.DtoClassName}{inheritance}");
     }
 
     private static void WriteProperties(IndentedStringBuilder sb, DtoGenerationContext context)
@@ -165,17 +152,24 @@ internal static class DtoCodeBuilder
             var isStringType = effectiveType.IsStringType();
             var isNumericType = effectiveType.IsNumericType();
 
-            // Add XML documentation - use custom description if provided, otherwise auto-generate
-            sb.AppendLine($"/// <summary>");
-            if (!string.IsNullOrWhiteSpace(property.Description))
+            if (context.GenerateDocumentation)
             {
-                sb.AppendLine($"/// {property.Description}");
+                sb.AppendLine("/// <summary>");
+                if (!string.IsNullOrWhiteSpace(property.Description))
+                {
+                    sb.AppendLine($"/// {EscapeXml(property.Description!)}");
+                }
+                else
+                {
+                    sb.AppendLine($"/// Gets or sets the {property.PropertyName} value.");
+                }
+                sb.AppendLine("/// </summary>");
             }
-            else
+
+            if (context.GenerateJsonAttributes)
             {
-                sb.AppendLine($"/// Gets or sets the {property.PropertyName} value.");
+                WriteJsonAttributes(sb, property);
             }
-            sb.AppendLine($"/// </summary>");
 
             // Add required attribute if property is non-nullable reference type
             if (property.IsRequired)
@@ -209,6 +203,8 @@ internal static class DtoCodeBuilder
                 sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.Range({property.MinValue}, {property.MaxValue})]");
             }
 
+            WriteDtoValidationAttributes(sb, property);
+
             // Build property declaration
             var typeStr = property.PropertyType;
             if (property.IsNullable && !typeStr.EndsWith("?"))
@@ -216,7 +212,9 @@ internal static class DtoCodeBuilder
                 typeStr += "?";
             }
 
-            var propertyDeclaration = $"public {typeStr} {property.PropertyName} {{ get; set; }}";
+            var requiredModifier = context.UseRequiredMembers && property.IsRequired ? "required " : string.Empty;
+            var setter = context.UseInitOnlyProperties ? "init" : "set";
+            var propertyDeclaration = $"public {requiredModifier}{typeStr} {property.PropertyName} {{ get; {setter}; }}";
 
             if (property.HasDefaultValue && property.DefaultValue != null)
             {
@@ -226,7 +224,7 @@ internal static class DtoCodeBuilder
             {
                 propertyDeclaration += " = default!;";
             }
-            else if (isStringType)
+            else if (isStringType && !(context.UseRequiredMembers && property.IsRequired))
             {
                 propertyDeclaration += " = string.Empty;";
             }
@@ -236,13 +234,16 @@ internal static class DtoCodeBuilder
         }
     }
 
-    private static void WriteConstructors(IndentedStringBuilder sb, DtoGenerationContext context, bool generateParameterless)
+    private static void WriteConstructors(IndentedStringBuilder sb, DtoGenerationContext context)
     {
-        if (generateParameterless)
+        if (context.GenerateParameterlessConstructor)
         {
-            sb.AppendLine($"/// <summary>");
-            sb.AppendLine($"/// Initializes a new instance of the <see cref=\"{context.DtoClassName}\"/> class.");
-            sb.AppendLine($"/// </summary>");
+            if (context.GenerateDocumentation)
+            {
+                sb.AppendLine("/// <summary>");
+                sb.AppendLine($"/// Initializes a new instance of the <see cref=\"{context.DtoClassName}\"/> class.");
+                sb.AppendLine("/// </summary>");
+            }
             sb.AppendLine($"public {context.DtoClassName}()");
             sb.AppendLine("{");
             sb.AppendLine("}");
@@ -250,11 +251,14 @@ internal static class DtoCodeBuilder
         }
 
         // Generate constructor with all properties
-        if (context.Properties.Count > 0)
+        if (context.Properties.Length > 0)
         {
-            sb.AppendLine($"/// <summary>");
-            sb.AppendLine($"/// Initializes a new instance of the <see cref=\"{context.DtoClassName}\"/> class with specified values.");
-            sb.AppendLine($"/// </summary>");
+            if (context.GenerateDocumentation)
+            {
+                sb.AppendLine("/// <summary>");
+                sb.AppendLine($"/// Initializes a new instance of the <see cref=\"{context.DtoClassName}\"/> class with specified values.");
+                sb.AppendLine("/// </summary>");
+            }
 
             var parameters = context.Properties
                 .Select(p =>
@@ -289,7 +293,7 @@ internal static class DtoCodeBuilder
         sb.AppendLine("if (other is null) return false;");
         sb.AppendLine("if (ReferenceEquals(this, other)) return true;");
 
-        if (context.Properties.Count > 0)
+        if (context.Properties.Length > 0)
         {
             var comparisons = context.Properties
                 .Select(p => $"global::System.Collections.Generic.EqualityComparer<{p.PropertyType}>.Default.Equals({p.PropertyName}, other.{p.PropertyName})");
@@ -321,7 +325,7 @@ internal static class DtoCodeBuilder
         sb.AppendLine("{");
         sb.IncreaseIndent();
 
-        if (context.Properties.Count > 0)
+        if (context.Properties.Length > 0)
         {
             sb.AppendLine("var hash = new global::System.HashCode();");
             foreach (var property in context.Properties)
@@ -389,9 +393,10 @@ internal static class DtoCodeBuilder
         sb.AppendLine("{");
         sb.IncreaseIndent();
 
-        if (context.Properties.Count > 0)
+        var properties = context.Properties.Where(p => !p.Sensitive).ToArray();
+        if (properties.Length > 0)
         {
-            var propertyStrings = context.Properties
+            var propertyStrings = properties
                 .Select(p => $"{p.PropertyName} = {{{p.PropertyName}}}");
             // Generate: return $"CustomerDto {{ Id = {Id}, Name = {Name} }}";
             sb.AppendLine($"return $\"{context.DtoClassName} {{{{ {string.Join(", ", propertyStrings)} }}}}\";");
@@ -403,6 +408,66 @@ internal static class DtoCodeBuilder
 
         sb.DecreaseIndent();
         sb.AppendLine("}");
+    }
+
+    private static void WriteJsonAttributes(IndentedStringBuilder sb, PropertyContext property)
+    {
+        if (property.JsonIgnore)
+        {
+            sb.AppendLine("[global::System.Text.Json.Serialization.JsonIgnore]");
+        }
+
+        if (!string.IsNullOrWhiteSpace(property.JsonPropertyName))
+        {
+            sb.AppendLine($"[global::System.Text.Json.Serialization.JsonPropertyName(\"{EscapeStringLiteral(property.JsonPropertyName!)}\")]");
+        }
+
+        if (!string.IsNullOrWhiteSpace(property.JsonConverterTypeName))
+        {
+            sb.AppendLine($"[global::System.Text.Json.Serialization.JsonConverter(typeof({property.JsonConverterTypeName}))]");
+        }
+    }
+
+    private static void WriteDtoValidationAttributes(IndentedStringBuilder sb, PropertyContext property)
+    {
+        foreach (var validation in property.Validations)
+        {
+            if (validation.EmailAddress)
+                WriteValidationAttribute(sb, "EmailAddress", validation.ErrorMessage);
+            if (validation.Phone)
+                WriteValidationAttribute(sb, "Phone", validation.ErrorMessage);
+            if (validation.Url)
+                WriteValidationAttribute(sb, "Url", validation.ErrorMessage);
+            if (validation.CreditCard)
+                WriteValidationAttribute(sb, "CreditCard", validation.ErrorMessage);
+            if (!string.IsNullOrWhiteSpace(validation.CompareProperty))
+                WriteValidationAttribute(sb, "Compare", validation.ErrorMessage, $"\"{EscapeStringLiteral(validation.CompareProperty!)}\"");
+            if (!string.IsNullOrWhiteSpace(validation.CustomValidationTypeName))
+                sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.CustomValidation(typeof({validation.CustomValidationTypeName}), nameof({validation.CustomValidationTypeName}.{validation.CustomValidationMethod}))]");
+        }
+    }
+
+    private static void WriteValidationAttribute(IndentedStringBuilder sb, string attributeName, string? errorMessage, string? constructorArgument = null)
+    {
+        var argument = constructorArgument ?? string.Empty;
+        var separator = string.IsNullOrEmpty(argument) || string.IsNullOrWhiteSpace(errorMessage) ? string.Empty : ", ";
+        var namedArgument = string.IsNullOrWhiteSpace(errorMessage)
+            ? string.Empty
+            : $"ErrorMessage = \"{EscapeStringLiteral(errorMessage!)}\"";
+        sb.AppendLine($"[global::System.ComponentModel.DataAnnotations.{attributeName}({argument}{separator}{namedArgument})]");
+    }
+
+    private static string EscapeStringLiteral(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    private static string EscapeXml(string value)
+    {
+        return value
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;");
     }
 }
 

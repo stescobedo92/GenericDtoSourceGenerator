@@ -77,7 +77,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor InvalidStringValidationRange = new(
         id: DiagnosticIds.DTO008,
         title: "Invalid string validation range",
-        messageFormat: "Property '{0}' has invalid string length range: MinLength ({1}) cannot be greater than MaxLength ({2}).",
+        messageFormat: "Property '{0}' has invalid string length range: MinLength ({1}) cannot be greater than MaxLength ({2})",
         category: "GenerateDto",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -87,7 +87,7 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor InvalidNumericValidationRange = new(
         id: DiagnosticIds.DTO009,
         title: "Invalid numeric validation range",
-        messageFormat: "Property '{0}' has invalid numeric range: MinValue ({1}) cannot be greater than MaxValue ({2}).",
+        messageFormat: "Property '{0}' has invalid numeric range: MinValue ({1}) cannot be greater than MaxValue ({2})",
         category: "GenerateDto",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

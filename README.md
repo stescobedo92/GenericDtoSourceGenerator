@@ -13,7 +13,10 @@ A powerful C# source generator that automatically generates Data Transfer Object
 - 🎯 **Flexible Configuration**: Customize DTO names, namespaces, and property behavior
 - ✅ **Validation Ready**: Optional `IValidatableObject` implementation
 - 🔒 **Type Safe**: Full nullable reference type support
-- 📝 **Records Support**: Generate immutable record DTOs
+- 📝 **Records Support**: Generate record DTOs
+- 🧭 **Scenario DTOs**: Generate multiple DTOs from one source type
+- 🧩 **Mapper Controls**: Enable/disable mapper directions and customize mapper namespace/class names
+- 🧪 **DataAnnotations and JSON**: Generate validation and `System.Text.Json` attributes from DTO metadata
 
 ## Installation
 
@@ -78,7 +81,18 @@ var entities = dtos.ToEntityList();
 | `ImplementIValidatableObject` | `bool` | `false` | Implement `IValidatableObject` |
 | `AdditionalUsings` | `string[]` | `[]` | Additional using statements |
 | `IncludeInheritedProperties` | `bool` | `true` | Include properties from base classes |
+| `GenerateDocumentation` | `bool` | `true` | Generate XML documentation comments |
 | `GenerateMappers` | `bool` | `true` | Generate mapping extension methods |
+| `GenerateToDto` | `bool` | `true` | Generate entity-to-DTO mapper |
+| `GenerateToEntity` | `bool` | `true` | Generate DTO-to-entity mapper |
+| `GenerateUpdateFrom` | `bool` | `true` | Generate entity update mapper |
+| `GenerateCollectionMappers` | `bool` | `true` | Generate list mapping helpers |
+| `MapperNamespace` | `string?` | DTO namespace | Namespace for mapper extension class |
+| `MapperClassName` | `string?` | `{DtoName}MapperExtensions` | Mapper extension class name |
+| `GenerateToString` | `bool` | `true` | Generate `ToString()` for class DTOs |
+| `UseInitOnlyProperties` | `bool` | `false` | Generate `init` accessors |
+| `UseRequiredMembers` | `bool` | `false` | Generate C# `required` for required reference properties |
+| `GenerateJsonAttributes` | `bool` | `true` | Emit configured `System.Text.Json` attributes |
 
 ### `[DtoProperty]` Attribute
 
@@ -88,7 +102,7 @@ var entities = dtos.ToEntityList();
 | `Ignore` | `bool` | `false` | Exclude property from DTO |
 | `Type` | `Type?` | Original type | Custom type for the property |
 | `DefaultValue` | `string?` | None | Default value expression |
-| `ForceNullable` | `bool?` | Inherited | Force nullable/non-nullable |
+| `ForceNullable` | `NullableOption` | `Inherit` | Force nullable/non-nullable |
 | `Order` | `int` | `0` | Property order in DTO |
 | `Description` | `string?` | Auto | Custom XML documentation |
 | `MaxLength` | `int` | `-1` | Maximum length validation |
@@ -96,6 +110,16 @@ var entities = dtos.ToEntityList();
 | `Pattern` | `string?` | None | Regex pattern validation |
 | `MinValue` | `double` | `double.MinValue` | Minimum value for range |
 | `MaxValue` | `double` | `double.MaxValue` | Maximum value for range |
+| `MapFrom` | `string?` | Source property | Alternate source property for `ToDto()` |
+| `MapTo` | `string?` | Source property | Alternate entity property for reverse mapping |
+| `ConverterType` | `Type?` | None | Static converter type for custom mapping |
+| `ConverterMethod` | `string?` | None | Static converter method name |
+| `IgnoreReverseMap` | `bool` | `false` | Exclude property from `ToEntity()` and `UpdateFrom()` |
+| `Flatten` | `bool` | `false` | Allow a flattened `MapFrom` path such as `Address.City` |
+| `Sensitive` | `bool` | `false` | Exclude property from generated `ToString()` |
+| `JsonIgnore` | `bool` | `false` | Emit `[JsonIgnore]` |
+| `JsonPropertyName` | `string?` | None | Emit `[JsonPropertyName]` |
+| `JsonConverterType` | `Type?` | None | Emit `[JsonConverter]` |
 
 ### `[DtoIgnore]` Attribute
 
@@ -112,6 +136,8 @@ Shorthand for `[DtoProperty(Ignore = true)]` - excludes the property from the ge
 | `CreditCard` | `bool` | Adds `[CreditCard]` validation |
 | `ErrorMessage` | `string?` | Custom error message |
 | `CompareProperty` | `string?` | Property to compare against |
+| `CustomValidationType` | `Type?` | Type used with `[CustomValidation]` |
+| `CustomValidationMethod` | `string` | Static method used with `[CustomValidation]` |
 
 ## Advanced Examples
 
@@ -176,6 +202,46 @@ public class Employee
     
     [DtoIgnore]
     public decimal Salary { get; set; } // Sensitive data excluded
+}
+```
+
+### Multiple DTOs From One Entity
+
+```csharp
+[GenericDto(DtoName = "CustomerCreateDto", GenerateToEntity = false)]
+[GenericDto(DtoName = "CustomerResponseDto")]
+public class Customer
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+}
+```
+
+### Custom Mapper Controls
+
+```csharp
+[GenericDto(
+    MapperNamespace = "MyApi.Mapping",
+    MapperClassName = "CustomerMaps",
+    GenerateToEntity = false,
+    GenerateUpdateFrom = false)]
+public class Customer
+{
+    public int Id { get; set; }
+}
+```
+
+### JSON and Sensitive Properties
+
+```csharp
+[GenericDto(UseInitOnlyProperties = true, UseRequiredMembers = true)]
+public class Customer
+{
+    [DtoProperty(JsonPropertyName = "full_name")]
+    public string Name { get; set; }
+
+    [DtoProperty(Sensitive = true, JsonIgnore = true)]
+    public string InternalToken { get; set; }
 }
 ```
 

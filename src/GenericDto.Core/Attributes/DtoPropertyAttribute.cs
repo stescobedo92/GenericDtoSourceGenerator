@@ -96,6 +96,59 @@ public sealed class DtoPropertyAttribute : Attribute
     /// When set with MinValue, adds [Range] attribute to the generated property.
     /// </summary>
     public double MaxValue { get; set; } = double.MaxValue;
+
+    /// <summary>
+    /// Gets or sets an alternate source property name to read when mapping from entity to DTO.
+    /// </summary>
+    public string? MapFrom { get; set; }
+
+    /// <summary>
+    /// Gets or sets an alternate destination property name to write when mapping from DTO to entity.
+    /// </summary>
+    public string? MapTo { get; set; }
+
+    /// <summary>
+    /// Gets or sets a converter type used for custom mapping.
+    /// The converter method is resolved from ConverterMethod.
+    /// </summary>
+    public Type? ConverterType { get; set; }
+
+    /// <summary>
+    /// Gets or sets the converter method name used for custom mapping.
+    /// The method should be static and accept the source value.
+    /// </summary>
+    public string? ConverterMethod { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this property should be omitted from reverse mapping.
+    /// </summary>
+    public bool IgnoreReverseMap { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this property uses a flattened source path.
+    /// Combine with MapFrom, for example MapFrom = "Address.City".
+    /// </summary>
+    public bool Flatten { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether this property should be excluded from generated ToString output.
+    /// </summary>
+    public bool Sensitive { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to emit System.Text.Json.Serialization.JsonIgnoreAttribute.
+    /// </summary>
+    public bool JsonIgnore { get; set; }
+
+    /// <summary>
+    /// Gets or sets the JSON property name emitted with JsonPropertyNameAttribute.
+    /// </summary>
+    public string? JsonPropertyName { get; set; }
+
+    /// <summary>
+    /// Gets or sets the JSON converter type emitted with JsonConverterAttribute.
+    /// </summary>
+    public Type? JsonConverterType { get; set; }
 }
 
 /// <summary>

@@ -19,7 +19,9 @@ public static class SourceGeneratorTestHelper
     /// <returns>A tuple containing the compilation output, generated sources, and diagnostics.</returns>
     public static (Compilation OutputCompilation, ImmutableArray<GeneratedSourceResult> GeneratedSources, ImmutableArray<Diagnostic> Diagnostics) RunGenerator(string source)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        var syntaxTree = CSharpSyntaxTree.ParseText(
+            source,
+            CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview));
 
         // Get references from the runtime assemblies
         var references = GetMetadataReferences();
@@ -32,8 +34,11 @@ public static class SourceGeneratorTestHelper
                 .WithNullableContextOptions(NullableContextOptions.Enable));
 
         var generator = new DtoSourceGenerator();
+        var parseOptions = CSharpParseOptions.Default.WithLanguageVersion(LanguageVersion.Preview);
 
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            new[] { generator.AsSourceGenerator() },
+            parseOptions: parseOptions);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var diagnostics);
 
         var runResult = driver.GetRunResult();
@@ -77,6 +82,12 @@ public static class SourceGeneratorTestHelper
             references.Add(MetadataReference.CreateFromFile(annotationsPath));
         }
 
+        var systemTextJsonPath = Path.Combine(assemblyPath, "System.Text.Json.dll");
+        if (File.Exists(systemTextJsonPath))
+        {
+            references.Add(MetadataReference.CreateFromFile(systemTextJsonPath));
+        }
+
         // Try to load netstandard if needed
         try
         {
@@ -97,7 +108,7 @@ public static class SourceGeneratorTestHelper
     public static string? GetGeneratedSource(ImmutableArray<GeneratedSourceResult> sources, string hintNamePart)
     {
         var result = sources.FirstOrDefault(s => s.HintName.Contains(hintNamePart));
-        return result.SourceText; // Will return null if not found (default struct)
+        return result?.SourceText;
     }
 
     /// <summary>

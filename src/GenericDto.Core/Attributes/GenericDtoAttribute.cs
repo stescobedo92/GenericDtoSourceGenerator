@@ -16,7 +16,7 @@ namespace GenericDto.Core.Attributes;
 /// }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = false)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, Inherited = false, AllowMultiple = true)]
 public sealed class GenericDtoAttribute : Attribute
 {
     /// <summary>
@@ -90,4 +90,64 @@ public sealed class GenericDtoAttribute : Attribute
     /// Default is true.
     /// </summary>
     public bool GenerateMappers { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to generate the ToDto mapper.
+    /// Default is true.
+    /// </summary>
+    public bool GenerateToDto { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to generate the ToEntity mapper.
+    /// Default is true.
+    /// </summary>
+    public bool GenerateToEntity { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to generate the UpdateFrom mapper.
+    /// Default is true.
+    /// </summary>
+    public bool GenerateUpdateFrom { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether to generate collection mapper methods.
+    /// Default is true.
+    /// </summary>
+    public bool GenerateCollectionMappers { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the namespace for the generated mapper extensions.
+    /// If null or empty, defaults to the DTO namespace.
+    /// </summary>
+    public string? MapperNamespace { get; set; }
+
+    /// <summary>
+    /// Gets or sets the generated mapper extension class name.
+    /// If null or empty, defaults to {DtoName}MapperExtensions.
+    /// </summary>
+    public string? MapperClassName { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether to generate a ToString override for class DTOs.
+    /// Default is true.
+    /// </summary>
+    public bool GenerateToString { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets whether generated DTO properties should use init accessors.
+    /// Default is false.
+    /// </summary>
+    public bool UseInitOnlyProperties { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether non-nullable reference properties should use the C# required modifier.
+    /// Default is false.
+    /// </summary>
+    public bool UseRequiredMembers { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether System.Text.Json attributes should be emitted when configured on properties.
+    /// Default is true.
+    /// </summary>
+    public bool GenerateJsonAttributes { get; set; } = true;
 }

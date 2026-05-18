@@ -22,7 +22,7 @@
     <PackageIcon>binarycoffee.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
-    <PackageReleaseNotes>Updated documentation and README.</PackageReleaseNotes>
+    <PackageReleaseNotes>Added mapper controls, multiple DTO scenarios, validation and JSON metadata generation, and packaged the source generator with the main NuGet package.</PackageReleaseNotes>
     
     <!-- Repository Information -->
     <RepositoryType>git</RepositoryType>
@@ -38,6 +38,11 @@
     <None Include="..\..\assets\binarycoffee.png" Pack="true" PackagePath="\" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\LICENSE.txt" Pack="true" PackagePath="\" />
+    <None Include="..\GenericDto.Analyzers\bin\$(Configuration)\netstandard2.0\GenericDto.Analyzers.dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false"
+          Condition="Exists('..\GenericDto.Analyzers\bin\$(Configuration)\netstandard2.0\GenericDto.Analyzers.dll')" />
   </ItemGroup>
 
 </Project>

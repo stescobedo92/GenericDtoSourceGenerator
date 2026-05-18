@@ -5,6 +5,7 @@ internal static class GeneratorConstants
     public const string GenericDtoCoreAttributeFullName = "GenericDto.Core.Attributes.GenericDtoAttribute";
     public const string DtoPropertyAttributeFullName = "GenericDto.Core.Attributes.DtoPropertyAttribute";
     public const string DtoIgnoreAttributeFullName = "GenericDto.Core.Attributes.DtoIgnoreAttribute";
+    public const string DtoValidationAttributeFullName = "GenericDto.Core.Attributes.DtoValidationAttribute";
 
     public const string DtoSuffix = "Dto";
     public const string DtoNamespaceSuffix = ".Dto";

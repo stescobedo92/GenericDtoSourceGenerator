@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Text;
 using GenericDto.Analyzers.Extensions;
 using GenericDto.Analyzers.Generators.Incremental;
 using Microsoft.CodeAnalysis;
@@ -27,21 +26,20 @@ internal static class MapperCodeBuilder
         // Usings
         sb.AppendLine("using System;");
         sb.AppendLine("using System.Collections.Generic;");
-        sb.AppendLine("using System.Linq;");
 
         var sourceNamespace = context.SourceType.ContainingNamespace.ToDisplayString();
         if (!string.IsNullOrEmpty(sourceNamespace))
         {
             sb.AppendLine($"using {sourceNamespace};");
         }
-        if (context.TargetNamespace != sourceNamespace)
+        if (context.TargetNamespace != sourceNamespace && context.TargetNamespace != context.MapperNamespace)
         {
             sb.AppendLine($"using {context.TargetNamespace};");
         }
         sb.AppendLine();
 
         // Namespace
-        sb.AppendLine($"namespace {context.TargetNamespace}");
+        sb.AppendLine($"namespace {context.MapperNamespace}");
         sb.AppendLine("{");
         sb.IncreaseIndent();
 
@@ -58,38 +56,51 @@ internal static class MapperCodeBuilder
     {
         var sourceTypeName = context.SourceType.Name;
         var sourceTypeFullName = context.SourceType.ToDisplayString();
-        var dtoName = context.DtoClassName;
-        
-        // Get the access modifier from the DTO attribute
-        var accessModifier = context.GenerateDtoAttribute.GetNamedArgument<string>("AccessModifier") ?? "public";
+        var dtoName = context.TargetNamespace == context.MapperNamespace
+            ? context.DtoClassName
+            : $"{context.TargetNamespace}.{context.DtoClassName}";
 
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Extension methods for mapping between <see cref=\"{sourceTypeFullName}\"/> and <see cref=\"{dtoName}\"/>.");
-        sb.AppendLine("/// </summary>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// Extension methods for mapping between <see cref=\"{sourceTypeFullName}\"/> and <see cref=\"{context.DtoClassName}\"/>.");
+            sb.AppendLine("/// </summary>");
+        }
         sb.AppendLine("[global::System.CodeDom.Compiler.GeneratedCodeAttribute(\"GenericDto.Analyzers\", \"1.0.0\")]");
         sb.AppendLine("[global::System.Diagnostics.DebuggerNonUserCodeAttribute]");
         sb.AppendLine("[global::System.Runtime.CompilerServices.CompilerGeneratedAttribute]");
-        sb.AppendLine($"{accessModifier} static class {dtoName}MapperExtensions");
+        sb.AppendLine($"{context.AccessModifier} static class {context.MapperClassName}");
         sb.AppendLine("{");
         sb.IncreaseIndent();
 
-        // ToDto extension method
-        WriteToDto(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
-        sb.AppendLine();
+        if (context.GenerateToDto)
+        {
+            WriteToDto(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
+            sb.AppendLine();
+        }
 
-        // ToEntity extension method (reverse mapping)
-        WriteToEntity(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
-        sb.AppendLine();
+        if (context.GenerateToEntity)
+        {
+            WriteToEntity(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
+            sb.AppendLine();
+        }
 
-        // Collection mapping methods
-        WriteToDtoCollection(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
-        sb.AppendLine();
+        if (context.GenerateCollectionMappers && context.GenerateToDto)
+        {
+            WriteToDtoCollection(sb, context, sourceTypeFullName, dtoName);
+            sb.AppendLine();
+        }
 
-        WriteToEntityCollection(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
-        sb.AppendLine();
+        if (context.GenerateCollectionMappers && context.GenerateToEntity)
+        {
+            WriteToEntityCollection(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
+            sb.AppendLine();
+        }
 
-        // Update entity from DTO
-        WriteUpdateEntity(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
+        if (context.GenerateUpdateFrom)
+        {
+            WriteUpdateEntity(sb, context, sourceTypeName, sourceTypeFullName, dtoName);
+        }
 
         sb.DecreaseIndent();
         sb.AppendLine("}");
@@ -99,11 +110,14 @@ internal static class MapperCodeBuilder
     {
         var isSourceValueType = context.SourceType.IsValueType;
         
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Maps a <see cref=\"{sourceTypeFullName}\"/> instance to a new <see cref=\"{dtoName}\"/> instance.");
-        sb.AppendLine("/// </summary>");
-        sb.AppendLine($"/// <param name=\"source\">The source {sourceTypeName} instance.</param>");
-        sb.AppendLine($"/// <returns>A new {dtoName} instance with mapped values.</returns>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// Maps a <see cref=\"{sourceTypeFullName}\"/> instance to a new <see cref=\"{context.DtoClassName}\"/> instance.");
+            sb.AppendLine("/// </summary>");
+            sb.AppendLine($"/// <param name=\"source\">The source {sourceTypeName} instance.</param>");
+            sb.AppendLine($"/// <returns>A new {context.DtoClassName} instance with mapped values.</returns>");
+        }
         sb.AppendLine($"public static {dtoName} ToDto(this {sourceTypeFullName} source)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
@@ -126,13 +140,19 @@ internal static class MapperCodeBuilder
 
         foreach (var property in context.Properties)
         {
-            var sourcePropertyName = property.SourceProperty.Name;
-            if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, property.SourceProperty.Type))
+            var sourcePropertyName = string.IsNullOrWhiteSpace(property.MapFrom) ? property.SourceProperty.Name : property.MapFrom!;
+            var expression = $"source.{sourcePropertyName}";
+            var usesCustomPath = property.Flatten || sourcePropertyName.Contains(".");
+            if (HasConverter(property))
+            {
+                expression = $"{property.ConverterTypeName}.{property.ConverterMethod}({expression})";
+            }
+            else if (!usesCustomPath && !SymbolEqualityComparer.Default.Equals(property.EffectiveType, property.SourceProperty.Type))
             {
                 sb.AppendLine($"// {property.PropertyName}: type overridden - manual mapping required (DTO: '{property.EffectiveType.ToDisplayString()}', Entity: '{property.SourceProperty.Type.ToDisplayString()}').");
                 continue;
             }
-            sb.AppendLine($"{property.PropertyName} = source.{sourcePropertyName},");
+            sb.AppendLine($"{property.PropertyName} = {expression},");
         }
 
         sb.DecreaseIndent();
@@ -153,11 +173,14 @@ internal static class MapperCodeBuilder
             return;
         }
 
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Maps a <see cref=\"{dtoName}\"/> instance to a new <see cref=\"{sourceTypeFullName}\"/> instance.");
-        sb.AppendLine("/// </summary>");
-        sb.AppendLine($"/// <param name=\"dto\">The source {dtoName} instance.</param>");
-        sb.AppendLine($"/// <returns>A new {sourceTypeName} instance with mapped values.</returns>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// Maps a <see cref=\"{context.DtoClassName}\"/> instance to a new <see cref=\"{sourceTypeFullName}\"/> instance.");
+            sb.AppendLine("/// </summary>");
+            sb.AppendLine($"/// <param name=\"dto\">The source {context.DtoClassName} instance.</param>");
+            sb.AppendLine($"/// <returns>A new {sourceTypeName} instance with mapped values.</returns>");
+        }
         sb.AppendLine($"public static {sourceTypeFullName} ToEntity(this {dtoName} dto)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
@@ -173,17 +196,40 @@ internal static class MapperCodeBuilder
         sb.IncreaseIndent();
 
         // Only map properties that have a setter on the source type
+        var explicitReverseTargets = new global::System.Collections.Generic.HashSet<string>(
+            context.Properties
+                .Where(p => !string.IsNullOrWhiteSpace(p.MapTo))
+                .Select(p => p.MapTo!),
+            StringComparer.Ordinal);
+        var initializedTargets = new global::System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+
         foreach (var property in context.Properties)
         {
+            if (property.IgnoreReverseMap)
+                continue;
+            if (property.Flatten && string.IsNullOrWhiteSpace(property.MapTo))
+                continue;
+
             var sourceProperty = property.SourceProperty;
             if (sourceProperty.SetMethod != null && sourceProperty.SetMethod.DeclaredAccessibility == Accessibility.Public)
             {
-                if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, sourceProperty.Type))
+                var targetPropertyName = string.IsNullOrWhiteSpace(property.MapTo) ? sourceProperty.Name : property.MapTo!;
+                if (explicitReverseTargets.Contains(targetPropertyName) && string.IsNullOrWhiteSpace(property.MapTo))
+                    continue;
+                if (!initializedTargets.Add(targetPropertyName))
+                    continue;
+
+                var expression = $"dto.{property.PropertyName}";
+                if (HasConverter(property))
+                {
+                    expression = $"{property.ConverterTypeName}.{property.ConverterMethod}({expression})";
+                }
+                else if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, sourceProperty.Type))
                 {
                     sb.AppendLine($"// {sourceProperty.Name}: type overridden - manual mapping required (DTO: '{property.EffectiveType.ToDisplayString()}', Entity: '{sourceProperty.Type.ToDisplayString()}').");
                     continue;
                 }
-                sb.AppendLine($"{sourceProperty.Name} = dto.{property.PropertyName},");
+                sb.AppendLine($"{targetPropertyName} = {expression},");
             }
         }
 
@@ -193,13 +239,16 @@ internal static class MapperCodeBuilder
         sb.AppendLine("}");
     }
 
-    private static void WriteToDtoCollection(IndentedStringBuilder sb, DtoGenerationContext context, string sourceTypeName, string sourceTypeFullName, string dtoName)
+    private static void WriteToDtoCollection(IndentedStringBuilder sb, DtoGenerationContext context, string sourceTypeFullName, string dtoName)
     {
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Maps a collection of <see cref=\"{sourceTypeFullName}\"/> instances to a list of <see cref=\"{dtoName}\"/> instances.");
-        sb.AppendLine("/// </summary>");
-        sb.AppendLine($"/// <param name=\"source\">The source collection.</param>");
-        sb.AppendLine($"/// <returns>A list of {dtoName} instances with mapped values.</returns>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// Maps a collection of <see cref=\"{sourceTypeFullName}\"/> instances to a list of <see cref=\"{context.DtoClassName}\"/> instances.");
+            sb.AppendLine("/// </summary>");
+            sb.AppendLine("/// <param name=\"source\">The source collection.</param>");
+            sb.AppendLine($"/// <returns>A list of {context.DtoClassName} instances with mapped values.</returns>");
+        }
         sb.AppendLine($"public static global::System.Collections.Generic.List<{dtoName}> ToDtoList(this global::System.Collections.Generic.IEnumerable<{sourceTypeFullName}> source)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
@@ -210,7 +259,16 @@ internal static class MapperCodeBuilder
         sb.DecreaseIndent();
         sb.AppendLine("}");
         sb.AppendLine();
-        sb.AppendLine("return source.Select(x => x.ToDto()).ToList();");
+        sb.AppendLine($"var result = source is global::System.Collections.Generic.ICollection<{sourceTypeFullName}> collection");
+        sb.AppendLine($"    ? new global::System.Collections.Generic.List<{dtoName}>(collection.Count)");
+        sb.AppendLine($"    : new global::System.Collections.Generic.List<{dtoName}>();");
+        sb.AppendLine("foreach (var item in source)");
+        sb.AppendLine("{");
+        sb.IncreaseIndent();
+        sb.AppendLine("result.Add(ToDto(item));");
+        sb.DecreaseIndent();
+        sb.AppendLine("}");
+        sb.AppendLine("return result;");
         sb.DecreaseIndent();
         sb.AppendLine("}");
     }
@@ -227,11 +285,14 @@ internal static class MapperCodeBuilder
             return;
         }
 
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Maps a collection of <see cref=\"{dtoName}\"/> instances to a list of <see cref=\"{sourceTypeFullName}\"/> instances.");
-        sb.AppendLine("/// </summary>");
-        sb.AppendLine($"/// <param name=\"dtos\">The source DTO collection.</param>");
-        sb.AppendLine($"/// <returns>A list of {sourceTypeName} instances with mapped values.</returns>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// Maps a collection of <see cref=\"{context.DtoClassName}\"/> instances to a list of <see cref=\"{sourceTypeFullName}\"/> instances.");
+            sb.AppendLine("/// </summary>");
+            sb.AppendLine("/// <param name=\"dtos\">The source DTO collection.</param>");
+            sb.AppendLine($"/// <returns>A list of {sourceTypeName} instances with mapped values.</returns>");
+        }
         sb.AppendLine($"public static global::System.Collections.Generic.List<{sourceTypeFullName}> ToEntityList(this global::System.Collections.Generic.IEnumerable<{dtoName}> dtos)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
@@ -242,7 +303,16 @@ internal static class MapperCodeBuilder
         sb.DecreaseIndent();
         sb.AppendLine("}");
         sb.AppendLine();
-        sb.AppendLine("return dtos.Select(x => x.ToEntity()).ToList();");
+        sb.AppendLine($"var result = dtos is global::System.Collections.Generic.ICollection<{dtoName}> collection");
+        sb.AppendLine($"    ? new global::System.Collections.Generic.List<{sourceTypeFullName}>(collection.Count)");
+        sb.AppendLine($"    : new global::System.Collections.Generic.List<{sourceTypeFullName}>();");
+        sb.AppendLine("foreach (var dto in dtos)");
+        sb.AppendLine("{");
+        sb.IncreaseIndent();
+        sb.AppendLine("result.Add(ToEntity(dto));");
+        sb.DecreaseIndent();
+        sb.AppendLine("}");
+        sb.AppendLine("return result;");
         sb.DecreaseIndent();
         sb.AppendLine("}");
     }
@@ -251,12 +321,15 @@ internal static class MapperCodeBuilder
     {
         var isSourceValueType = context.SourceType.IsValueType;
         
-        sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Updates an existing <see cref=\"{sourceTypeFullName}\"/> instance with values from a <see cref=\"{dtoName}\"/>.");
-        sb.AppendLine("/// </summary>");
-        sb.AppendLine($"/// <param name=\"entity\">The entity to update.</param>");
-        sb.AppendLine($"/// <param name=\"dto\">The DTO containing the new values.</param>");
-        sb.AppendLine($"/// <returns>The updated entity instance.</returns>");
+        if (context.GenerateDocumentation)
+        {
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine($"/// Updates an existing <see cref=\"{sourceTypeFullName}\"/> instance with values from a <see cref=\"{context.DtoClassName}\"/>.");
+            sb.AppendLine("/// </summary>");
+            sb.AppendLine("/// <param name=\"entity\">The entity to update.</param>");
+            sb.AppendLine("/// <param name=\"dto\">The DTO containing the new values.</param>");
+            sb.AppendLine("/// <returns>The updated entity instance.</returns>");
+        }
         sb.AppendLine($"public static {sourceTypeFullName} UpdateFrom(this {sourceTypeFullName} entity, {dtoName} dto)");
         sb.AppendLine("{");
         sb.IncreaseIndent();
@@ -282,17 +355,40 @@ internal static class MapperCodeBuilder
         sb.AppendLine();
 
         // Only update properties that have a setter on the source type
+        var explicitReverseTargets = new global::System.Collections.Generic.HashSet<string>(
+            context.Properties
+                .Where(p => !string.IsNullOrWhiteSpace(p.MapTo))
+                .Select(p => p.MapTo!),
+            StringComparer.Ordinal);
+        var updatedTargets = new global::System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+
         foreach (var property in context.Properties)
         {
+            if (property.IgnoreReverseMap)
+                continue;
+            if (property.Flatten && string.IsNullOrWhiteSpace(property.MapTo))
+                continue;
+
             var sourceProperty = property.SourceProperty;
             if (sourceProperty.SetMethod != null && sourceProperty.SetMethod.DeclaredAccessibility == Accessibility.Public)
             {
-                if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, sourceProperty.Type))
+                var targetPropertyName = string.IsNullOrWhiteSpace(property.MapTo) ? sourceProperty.Name : property.MapTo!;
+                if (explicitReverseTargets.Contains(targetPropertyName) && string.IsNullOrWhiteSpace(property.MapTo))
+                    continue;
+                if (!updatedTargets.Add(targetPropertyName))
+                    continue;
+
+                var expression = $"dto.{property.PropertyName}";
+                if (HasConverter(property))
+                {
+                    expression = $"{property.ConverterTypeName}.{property.ConverterMethod}({expression})";
+                }
+                else if (!SymbolEqualityComparer.Default.Equals(property.EffectiveType, sourceProperty.Type))
                 {
                     sb.AppendLine($"// {sourceProperty.Name}: type overridden - manual mapping required (DTO: '{property.EffectiveType.ToDisplayString()}', Entity: '{sourceProperty.Type.ToDisplayString()}').");
                     continue;
                 }
-                sb.AppendLine($"entity.{sourceProperty.Name} = dto.{property.PropertyName};");
+                sb.AppendLine($"entity.{targetPropertyName} = {expression};");
             }
         }
 
@@ -300,5 +396,11 @@ internal static class MapperCodeBuilder
         sb.AppendLine("return entity;");
         sb.DecreaseIndent();
         sb.AppendLine("}");
+    }
+
+    private static bool HasConverter(PropertyContext property)
+    {
+        return !string.IsNullOrWhiteSpace(property.ConverterTypeName) &&
+               !string.IsNullOrWhiteSpace(property.ConverterMethod);
     }
 }
