@@ -5,7 +5,7 @@ A powerful C# source generator that automatically generates Data Transfer Object
 [![.NET](https://img.shields.io/badge/.NET-10.0%2B-512BD4)](https://dotnet.microsoft.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![CI](https://github.com/stescobedo92/GenericDtoSourceGenerator/actions/workflows/publish-nuget.yml/badge.svg)](https://github.com/stescobedo92/GenericDtoSourceGenerator/actions/workflows/publish-nuget.yml)
-[![Latest Tag](https://img.shields.io/github/v/tag/stescobedo92/GenericDtoSourceGenerator?label=release&sort=semver)](https://github.com/stescobedo92/GenericDtoSourceGenerator/tags)
+[![Release](https://img.shields.io/badge/release-v1.1.0-blue)](https://github.com/stescobedo92/GenericDtoSourceGenerator/releases/tag/v1.1.0)
 
 ## Features
 
