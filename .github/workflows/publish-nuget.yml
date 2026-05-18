@@ -1,0 +1,269 @@
+name: Build, Test, Coverage, and Publish NuGet
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: "SemVer bump to apply. Use auto to infer from commit messages."
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CONFIGURATION: Release
+  SOLUTION_PATH: GenericDtoSourceGenerator.sln
+  PACKAGE_PROJECT: src/GenericDto.Core/GenericDto.Core.csproj
+  ANALYZER_PROJECT: src/GenericDto.Analyzers/GenericDto.Analyzers.csproj
+  PACKAGE_OUTPUT: artifacts/packages
+  COVERAGE_OUTPUT: artifacts/coverage
+
+jobs:
+  build-test-pack:
+    name: Build, test, coverage, and pack
+    runs-on: ubuntu-latest
+    outputs:
+      package_version: ${{ steps.version.outputs.package_version }}
+      publish_enabled: ${{ steps.publish_gate.outputs.publish_enabled }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Determine publish gate
+        id: publish_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            echo "publish_enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${GITHUB_REF_NAME}" != "${DEFAULT_BRANCH}" ]]; then
+            echo "publish_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Publishing is limited to the default branch (${DEFAULT_BRANCH})."
+            exit 0
+          fi
+
+          if [[ -z "${NUGET_ORG_API_KEY:-}" ]]; then
+            echo "publish_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::NUGET_ORG_API_KEY is not available. The workflow will build, test, and pack, but publishing will be skipped."
+            exit 0
+          fi
+
+          echo "publish_enabled=true" >> "$GITHUB_OUTPUT"
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          NUGET_ORG_API_KEY: ${{ secrets.NUGET_ORG_API_KEY }}
+
+      - name: Determine SemVer package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_version="$(grep -m1 '<Version>' "$PACKAGE_PROJECT" | sed -E 's/.*<Version>([^<]+)<\/Version>.*/\1/')"
+          latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1 || true)"
+
+          if [[ -n "$latest_tag" ]]; then
+            version="${latest_tag#v}"
+            range="${latest_tag}..HEAD"
+          else
+            version="$base_version"
+            range="HEAD"
+          fi
+
+          IFS='.' read -r major minor patch <<< "$version"
+          bump="${{ inputs.version_bump || 'auto' }}"
+
+          if [[ "$bump" == "auto" ]]; then
+            messages="$(git log --format=%B $range || true)"
+            if echo "$messages" | grep -Eq 'BREAKING CHANGE|^[a-zA-Z]+(\([^)]+\))?!:'; then
+              bump="major"
+            elif echo "$messages" | grep -Eq '^feat(\([^)]+\))?:'; then
+              bump="minor"
+            else
+              bump="patch"
+            fi
+          fi
+
+          case "$bump" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+            *)
+              echo "::error::Unsupported version bump '$bump'."
+              exit 1
+              ;;
+          esac
+
+          package_version="${major}.${minor}.${patch}"
+          tag="v${package_version}"
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists. Refusing to publish a duplicate SemVer version."
+            exit 1
+          fi
+
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "Computed package version: $package_version"
+
+      - name: Restore
+        run: dotnet restore "$SOLUTION_PATH"
+
+      - name: Build analyzer
+        run: dotnet build "$ANALYZER_PROJECT" --configuration "$CONFIGURATION" --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Build solution
+        run: dotnet build "$SOLUTION_PATH" --configuration "$CONFIGURATION" --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.package_version }}
+
+      - name: Test with code coverage
+        run: >
+          dotnet test "$SOLUTION_PATH"
+          --configuration "$CONFIGURATION"
+          --no-build
+          --collect:"XPlat Code Coverage"
+          --results-directory "$COVERAGE_OUTPUT"
+          --logger "trx;LogFileName=test-results.trx"
+
+      - name: Install coverage report generator
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage report
+        run: >
+          "$HOME/.dotnet/tools/reportgenerator"
+          -reports:"$COVERAGE_OUTPUT/**/coverage.cobertura.xml"
+          -targetdir:"$COVERAGE_OUTPUT/report"
+          -reporttypes:"Cobertura;HtmlInline_AzurePipelines;TextSummary"
+
+      - name: Print coverage summary
+        run: cat "$COVERAGE_OUTPUT/report/Summary.txt"
+
+      - name: Pack NuGet package
+        run: >
+          dotnet pack "$PACKAGE_PROJECT"
+          --configuration "$CONFIGURATION"
+          --no-build
+          --output "$PACKAGE_OUTPUT"
+          -p:PackageVersion=${{ steps.version.outputs.package_version }}
+          -p:Version=${{ steps.version.outputs.package_version }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Verify package contains analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$(find "$PACKAGE_OUTPUT" -maxdepth 1 -name '*.nupkg' ! -name '*.symbols.nupkg' | head -n1)"
+          unzip -l "$package" | tee "$PACKAGE_OUTPUT/package-contents.txt"
+          unzip -l "$package" | grep -q 'analyzers/dotnet/cs/GenericDto.Analyzers.dll'
+          unzip -l "$package" | grep -q 'lib/netstandard2.0/GenericDto.Core.dll'
+
+      - name: Upload test and coverage artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-and-coverage
+          path: |
+            ${{ env.COVERAGE_OUTPUT }}
+            **/*.trx
+          if-no-files-found: warn
+
+      - name: Upload NuGet package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package-${{ steps.version.outputs.package_version }}
+          path: ${{ env.PACKAGE_OUTPUT }}/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish to NuGet.org
+    runs-on: ubuntu-latest
+    needs: build-test-pack
+    if: needs.build-test-pack.outputs.publish_enabled == 'true'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Download NuGet package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-package-${{ needs.build-test-pack.outputs.package_version }}
+          path: ${{ env.PACKAGE_OUTPUT }}
+
+      - name: Publish to NuGet.org
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet nuget push "$PACKAGE_OUTPUT"/*.nupkg \
+            --api-key "$NUGET_ORG_API_KEY" \
+            --source "https://api.nuget.org/v3/index.json" \
+            --skip-duplicate
+        env:
+          NUGET_ORG_API_KEY: ${{ secrets.NUGET_ORG_API_KEY }}
+
+      - name: Tag published version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${{ needs.build-test-pack.outputs.package_version }}"
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists after publishing. Refusing to move it."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"

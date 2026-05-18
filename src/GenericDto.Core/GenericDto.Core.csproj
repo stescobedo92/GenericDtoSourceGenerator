@@ -18,7 +18,7 @@
     <Copyright>Copyright © Sergio Triana Escobedo 2026</Copyright>
     
     <!-- Package Generation -->
-    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
     <PackageIcon>binarycoffee.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
